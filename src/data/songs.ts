@@ -1026,24 +1026,24 @@ export function createChartNotes(
   return builder.getSortedNotes();
 }
 
-// 1. 공통 오디오 로더 헬퍼 (FLAC 및 MP3 고음질 완벽 호환)
+// 1. 공통 오디오 로더 헬퍼 (고음질 MP3 최적화)
 const loadAudioBuffer = (filePath: string) => async (ctx: AudioContext): Promise<AudioBuffer> => {
+  const targetPath = filePath.replace(/\.flac$/i, '.mp3');
   try {
-    const res = await fetch(encodeURI(filePath));
+    const res = await fetch(encodeURI(targetPath));
     if (res.ok) {
       const arrayBuffer = await res.arrayBuffer();
       return await ctx.decodeAudioData(arrayBuffer);
     }
   } catch {
-    // FLAC 로딩 실패 시 MP3 시도
+    // MP3 로딩 실패 시 원본 경로 시도
   }
 
-  const mp3Path = filePath.replace(/\.flac$/i, '.mp3');
-  const resMp3 = await fetch(encodeURI(mp3Path));
-  if (!resMp3.ok) {
-    throw new Error(`오디오 파일을 찾을 수 없습니다: ${filePath} 또는 ${mp3Path}`);
+  const resOrig = await fetch(encodeURI(filePath));
+  if (!resOrig.ok) {
+    throw new Error(`오디오 파일을 찾을 수 없습니다: ${targetPath} 또는 ${filePath}`);
   }
-  const arrayBuffer = await resMp3.arrayBuffer();
+  const arrayBuffer = await resOrig.arrayBuffer();
   return await ctx.decodeAudioData(arrayBuffer);
 };
 
@@ -1073,7 +1073,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#ff5b99',
     jacketColor2: '#ffe600',
     jacketUrl: '/images/청춘 콤플렉스.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/01. 青春コンプレックス.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/01. 青春コンプレックス.mp3'),
     charts: createStandardCharts(190, 160, 'jrock', 0.410)
   },
   {
@@ -1085,7 +1085,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#ffb703',
     jacketColor2: '#fb8500',
     jacketUrl: '/images/Distortion!!.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/03. Distortion!!.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/03. Distortion!!.mp3'),
     charts: createStandardCharts(195, 165, 'punk', 0.400)
   },
   {
@@ -1097,7 +1097,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#00f0ff',
     jacketColor2: '#ff2a6d',
     jacketUrl: '/images/별자리가 될 수 있다면.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/12. 星座になれたら.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/12. 星座になれたら.mp3'),
     charts: createStandardCharts(124, 133, 'funk', 0.417)
   },
   {
@@ -1109,7 +1109,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#3a86ff',
     jacketColor2: '#ff006e',
     jacketUrl: '/images/결속밴드.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/02. ひとりぼっち東京.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/02. ひとりぼっち東京.mp3'),
     charts: createStandardCharts(192, 185, 'jrock', 0.410)
   },
   {
@@ -1121,7 +1121,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#06d6a0',
     jacketColor2: '#ffd166',
     jacketUrl: '/images/결속밴드.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/04. ひみつ基地.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/04. ひみつ基地.mp3'),
     charts: createStandardCharts(180, 174, 'jrock', 0.980)
   },
   {
@@ -1133,7 +1133,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#0048ff',
     jacketColor2: '#00f5d4',
     jacketUrl: '/images/기타와 고독과 푸른 행성.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/05. ギターと孤独と蒼い惑星.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/05. ギターと孤独と蒼い惑星.mp3'),
     charts: createStandardCharts(193, 183, 'guitarhero', 0.370)
   },
   {
@@ -1145,7 +1145,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#8338ec',
     jacketColor2: '#ff0054',
     jacketUrl: '/images/결속밴드.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/06. ラブソングが歌えない.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/06. ラブソングが歌えない.mp3'),
     charts: createStandardCharts(186, 146, 'punk', 0.410)
   },
   {
@@ -1157,7 +1157,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#ffffff',
     jacketColor2: '#9d4edd',
     jacketUrl: '/images/그 밴드.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/07. あのバンド.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/07. あのバンド.mp3'),
     charts: createStandardCharts(190, 168, 'mathrock', 0.410)
   },
   {
@@ -1169,7 +1169,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#0055ff',
     jacketColor2: '#f4a261',
     jacketUrl: '/images/달각달각.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/08. カラカラ.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/08. カラカラ.mp3'),
     charts: createStandardCharts(190, 210, 'mathrock', 0.410)
   },
   {
@@ -1181,7 +1181,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#0077b6',
     jacketColor2: '#90e0ef',
     jacketUrl: '/images/결속밴드.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/09. 小さな海.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/09. 小さな海.mp3'),
     charts: createStandardCharts(94, 87, 'ballad', 0.400)
   },
   {
@@ -1193,7 +1193,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#ffd000',
     jacketColor2: '#ff007f',
     jacketUrl: '/images/뭐가 나빠.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/10. なにが悪い.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/10. なにが悪い.mp3'),
     charts: createStandardCharts(122, 115, 'poppunk', 0.430)
   },
   {
@@ -1205,7 +1205,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#ff0055',
     jacketColor2: '#ffbe0b',
     jacketUrl: '/images/잊어주지 않을 거야.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/11. 忘れてやらない.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/11. 忘れてやらない.mp3'),
     charts: createStandardCharts(184, 171, 'punk', 0.410)
   },
   {
@@ -1217,7 +1217,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#e0aaff',
     jacketColor2: '#3c096c',
     jacketUrl: '/images/결속밴드.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/13. フラッシュバッカー.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/13. フラッシュバッカー.mp3'),
     charts: createStandardCharts(77, 88, 'shoegaze', 0.410)
   },
   {
@@ -1229,7 +1229,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     jacketColor1: '#ff758f',
     jacketColor2: '#48cae4',
     jacketUrl: '/images/구르는 바위, 네게 아침이 내린다.jpg',
-    generateAudioBuffer: loadAudioBuffer('/audio/14. 転がる岩、君に朝が降る.flac'),
+    generateAudioBuffer: loadAudioBuffer('/audio/14. 転がる岩、君に朝が降る.mp3'),
     charts: createStandardCharts(150, 170, 'jrock', 0.410)
   }
 ];
