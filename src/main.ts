@@ -6,7 +6,7 @@ import { KeyConfigModal } from './ui/keyConfigModal';
 import { CustomSongModal } from './ui/customSongModal';
 import { SongSelectUI, SongSelectConfig } from './ui/songSelect';
 import { ResultScreenUI } from './ui/resultScreen';
-import { SongInfo, KeyMode, Difficulty } from './engine/types';
+import { SongInfo, KeyMode, Difficulty, PlayMods } from './engine/types';
 
 type GameScreen = 'TITLE' | 'SELECT' | 'GAME' | 'RESULT';
 
@@ -34,6 +34,8 @@ class RhythmGameApp {
   private hudTitleEl: HTMLElement;
   private hudModeEl: HTMLElement;
   private hudScoreEl: HTMLElement;
+  private hudModsBadgeEl: HTMLElement;
+  private hudAutoPlayBannerEl: HTMLElement;
 
   // 현재 게임 세션 상태
   private currentScreen: GameScreen = 'TITLE';
@@ -41,6 +43,7 @@ class RhythmGameApp {
   private currentSong: SongInfo | null = null;
   private currentKeyMode: KeyMode = '4K';
   private currentDifficulty: Difficulty = 'NORMAL';
+  private currentMods: PlayMods = { mirror: false, random: false, autoPlay: false };
   private speedMultiplier = 2.5;
   private songDuration = 0;
   private startCountdownSec = 1.0; // 노트가 판정선까지 미리 내려올 수 있는 여유 시간
@@ -78,6 +81,8 @@ class RhythmGameApp {
     this.hudTitleEl = document.getElementById('hud-track-title')!;
     this.hudModeEl = document.getElementById('hud-track-mode')!;
     this.hudScoreEl = document.getElementById('hud-score')!;
+    this.hudModsBadgeEl = document.getElementById('hud-mods-badge')!;
+    this.hudAutoPlayBannerEl = document.getElementById('hud-autoplay-banner')!;
 
     this.setupEvents();
     this.setupInputHandling();
@@ -225,6 +230,7 @@ class RhythmGameApp {
     this.currentKeyMode = config.keyMode;
     this.currentDifficulty = config.difficulty;
     this.speedMultiplier = config.speed;
+    this.currentMods = config.mods || { mirror: false, random: false, autoPlay: false };
 
     this.input.setMode(this.currentKeyMode);
     this.audio.setOffsetMs(config.offsetMs);
@@ -238,10 +244,46 @@ class RhythmGameApp {
       return;
     }
 
+    // 플레이 모드 (Mirror / Random) 적용
+    const totalLanes = this.currentKeyMode === '4K' ? 4 : 6;
+    let notesToPlay = chart.notes.map(n => ({ ...n }));
+
+    if (this.currentMods.random) {
+      // 0..totalLanes-1 무작위 1:1 순열 매핑
+      const perm = Array.from({ length: totalLanes }, (_, i) => i);
+      for (let i = perm.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [perm[i], perm[j]] = [perm[j], perm[i]];
+      }
+      notesToPlay = notesToPlay.map(n => ({ ...n, lane: perm[n.lane] }));
+    } else if (this.currentMods.mirror) {
+      // 좌우 대칭 반전
+      notesToPlay = notesToPlay.map(n => ({ ...n, lane: (totalLanes - 1) - n.lane }));
+    }
+
     // HUD 업데이트
     this.hudTitleEl.textContent = this.currentSong.title;
     this.hudModeEl.textContent = `${this.currentKeyMode} ${this.currentDifficulty}`;
     this.hudScoreEl.textContent = '0000000';
+
+    // 활성 모드 뱃지 표시
+    const activeModLabels: string[] = [];
+    if (this.currentMods.mirror) activeModLabels.push('MIRROR');
+    if (this.currentMods.random) activeModLabels.push('RANDOM');
+    if (this.currentMods.autoPlay) activeModLabels.push('AUTO');
+
+    if (activeModLabels.length > 0) {
+      this.hudModsBadgeEl.textContent = activeModLabels.join(' + ');
+      this.hudModsBadgeEl.classList.remove('hidden');
+    } else {
+      this.hudModsBadgeEl.classList.add('hidden');
+    }
+
+    if (this.currentMods.autoPlay) {
+      this.hudAutoPlayBannerEl.classList.remove('hidden');
+    } else {
+      this.hudAutoPlayBannerEl.classList.add('hidden');
+    }
 
     // 오디오 버퍼 생성 및 준비 (비동기 fetch 완벽 지원)
     const audioCtx = this.audio.getContext();
@@ -255,7 +297,7 @@ class RhythmGameApp {
       this.currentSong.artist,
       this.currentKeyMode,
       this.currentDifficulty,
-      chart.notes
+      notesToPlay
     );
 
     this.isPaused = false;
@@ -273,7 +315,8 @@ class RhythmGameApp {
       keyMode: this.currentKeyMode,
       difficulty: this.currentDifficulty,
       speed: this.speedMultiplier,
-      offsetMs: this.audio.getOffsetMs()
+      offsetMs: this.audio.getOffsetMs(),
+      mods: { ...this.currentMods }
     });
   }
 
@@ -319,6 +362,21 @@ class RhythmGameApp {
         const songTime = this.audio.getCurrentSongTime();
 
         if (!this.isPaused) {
+          // 오토 플레이 시뮬레이션
+          if (this.currentMods.autoPlay) {
+            const notes = this.judgement.getNotes();
+            for (let i = 0; i < notes.length; i++) {
+              const note = notes[i];
+              if (!note.hit && !note.missed && songTime >= note.time) {
+                this.audio.playHitSound('tap');
+                this.judgement.handleKeyDown(note.lane, note.time);
+              }
+              if (note.type === 'hold' && note.holding && songTime >= note.time + note.duration) {
+                this.judgement.handleKeyUp(note.lane, note.time + note.duration);
+              }
+            }
+          }
+
           // 판정 업데이트 (자동 미스, 롱노트 틱)
           this.judgement.update(songTime);
 
@@ -354,7 +412,7 @@ class RhythmGameApp {
   private finishGame() {
     this.audio.stop();
     const result = this.judgement.getPlayResult();
-    this.resultScreenUI.showResult(result, this.currentSong!.id);
+    this.resultScreenUI.showResult(result, this.currentSong!.id, this.currentMods.autoPlay);
     this.setScreen('RESULT');
   }
 }

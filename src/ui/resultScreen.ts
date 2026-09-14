@@ -58,11 +58,16 @@ export class ResultScreenUI {
     this.onSelectCallback = cb;
   }
 
-  public showResult(result: PlayResult, songId: string) {
-    this.statusTextEl.textContent = result.isClear ? 'LIVE PERFORMANCE CLEAR!' : 'LIVE FAILED...';
-    this.statusTextEl.style.color = result.isClear ? '#ff6b9d' : '#ff4365';
+  public showResult(result: PlayResult, songId: string, isAutoPlay = false) {
+    if (isAutoPlay) {
+      this.statusTextEl.textContent = '⚡ AUTO PLAY DEMONSTRATION ⚡';
+      this.statusTextEl.style.color = '#ffd700';
+    } else {
+      this.statusTextEl.textContent = result.isClear ? 'LIVE PERFORMANCE CLEAR!' : 'LIVE FAILED...';
+      this.statusTextEl.style.color = result.isClear ? '#ff6b9d' : '#ff4365';
+    }
 
-    this.trackInfoEl.textContent = `${result.songTitle} // ${result.keyMode} ${result.difficulty}`;
+    this.trackInfoEl.textContent = `${result.songTitle} // ${result.keyMode} ${result.difficulty}${isAutoPlay ? ' [AUTO]' : ''}`;
     this.rankBadgeEl.textContent = result.rank;
     this.finalScoreEl.textContent = result.score.toLocaleString();
     this.accuracyEl.textContent = `ACCURACY ${result.accuracy.toFixed(2)}%`;
@@ -78,8 +83,10 @@ export class ResultScreenUI {
     // 결속밴드 캐릭터 코멘트 출력
     this.updateCharacterComment(result.isClear, result.rank);
 
-    // 하이스코어 갱신
-    this.saveRecord(songId, result);
+    // 하이스코어 갱신 (오토플레이가 아닐 때만 저장)
+    if (!isAutoPlay) {
+      this.saveRecord(songId, result);
+    }
   }
 
   private updateCharacterComment(isClear: boolean, rank: string) {

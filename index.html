@@ -50,7 +50,19 @@
       <main class="select-body">
         <!-- 좌측: 트랙 리스트 -->
         <div class="track-list-panel">
-          <div class="panel-title">LIVE SETLIST</div>
+          <div class="panel-header-row">
+            <div class="panel-title">LIVE SETLIST</div>
+            <div class="track-count-badge" id="track-count-badge">31 TRACKS</div>
+          </div>
+          <!-- 앨범 카테고리 탭 -->
+          <div class="category-tabs" id="category-tabs">
+            <button class="cat-tab active" data-cat="ALL">전체 (31)</button>
+            <button class="cat-tab" data-cat="結束バンド">結束バンド (14)</button>
+            <button class="cat-tab" data-cat="Re:結束バンド">Re:結束バンド (6)</button>
+            <button class="cat-tab" data-cat="We will">We will (4)</button>
+            <button class="cat-tab" data-cat="結束バンドの歌ってみた">歌ってみた (5)</button>
+            <button class="cat-tab" data-cat="光の中へ">光の中へ (2)</button>
+          </div>
           <div id="track-list-container" class="track-list">
             <!-- 자바스크립트로 동적 생성 -->
           </div>
@@ -86,6 +98,15 @@
                 <button class="diff-btn active" data-diff="NORMAL">NORMAL</button>
                 <button class="diff-btn" data-diff="HARD">HARD</button>
                 <button class="diff-btn" data-diff="EXPERT">EXPERT</button>
+              </div>
+            </div>
+
+            <div class="option-row">
+              <label>PLAY MODS</label>
+              <div class="btn-group mods-group" id="mods-group">
+                <button class="mod-btn" id="btn-mod-mirror" data-mod="mirror" title="좌우 레인 반전">MIRROR</button>
+                <button class="mod-btn" id="btn-mod-random" data-mod="random" title="레인 무작위 셔플">RANDOM</button>
+                <button class="mod-btn" id="btn-mod-autoplay" data-mod="autoPlay" title="AI 완벽 자동 연주">AUTO PLAY</button>
               </div>
             </div>
 
@@ -144,6 +165,7 @@
         <div class="hud-left">
           <span id="hud-track-title">CYBER VELOCITY</span>
           <span id="hud-track-mode" class="tag-sm">4K HARD</span>
+          <span id="hud-mods-badge" class="tag-sm mods-badge hidden"></span>
         </div>
         <div class="hud-center">
           <div class="score-display">
@@ -158,6 +180,9 @@
 
       <!-- 메인 리듬게임 캔버스 -->
       <div class="canvas-wrapper">
+        <div id="hud-autoplay-banner" class="hud-autoplay-banner hidden">
+          <span class="auto-pulse">⚡ AUTO PLAYING ⚡</span>
+        </div>
         <canvas id="game-canvas"></canvas>
       </div>
 

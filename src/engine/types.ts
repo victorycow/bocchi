@@ -35,12 +35,21 @@ export interface SongChart {
   chartSource?: string;
 }
 
+export type SongAlbum = '結束バンド' | 'Re:結束バンド' | 'We will' | '結束バンドの歌ってみた' | '光の中へ';
+
+export interface PlayMods {
+  mirror: boolean;
+  random: boolean;
+  autoPlay: boolean;
+}
+
 export interface SongInfo {
   id: string;
   title: string;
   artist: string;
   bpm: number;
   genre: string;
+  album?: SongAlbum;
   jacketColor1: string;
   jacketColor2: string;
   jacketUrl?: string;

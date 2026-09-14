@@ -1,184 +1,13 @@
-import { SongInfo, SongChart, NoteData, KeyMode, Difficulty, NoteType } from '../engine/types';
+import { SongInfo, SongChart, NoteData, KeyMode, Difficulty, NoteType, SongAlbum } from '../engine/types';
 
-/**
- * Web Audio API를 활용한 고품질 절차적 EDM/신스웨이브 사운드트랙 생성기
- */
-function createSynthwaveTrack(ctx: AudioContext, bpm: number, totalBars = 24): AudioBuffer {
-  const sampleRate = ctx.sampleRate;
-  const beatSec = 60 / bpm;
-  const barSec = beatSec * 4;
-  const totalDuration = totalBars * barSec + 1.0;
-  const totalSamples = Math.floor(sampleRate * totalDuration);
-
-  // 스테레오 오디오 버퍼 생성
-  const buffer = ctx.createBuffer(2, totalSamples, sampleRate);
-  const left = buffer.getChannelData(0);
-  const right = buffer.getChannelData(1);
-
-  // 1. 드럼 & 베이스 & 신스 렌더링 헬퍼
-  const addSample = (chL: number, chR: number, idx: number) => {
-    if (idx < totalSamples) {
-      left[idx] += chL;
-      right[idx] += chR;
-    }
-  };
-
-  // 킥 드럼 합성기 (Punchy Synth Kick)
-  const renderKick = (startSec: number) => {
-    const startIdx = Math.floor(startSec * sampleRate);
-    const duration = 0.25;
-    const count = Math.floor(duration * sampleRate);
-
-    for (let i = 0; i < count; i++) {
-      const t = i / sampleRate;
-      // 피치 드롭 150Hz -> 40Hz
-      const freq = 45 + 110 * Math.exp(-t * 24);
-      const phase = 2 * Math.PI * (45 * t + (110 / 24) * (1 - Math.exp(-t * 24)));
-      const env = Math.exp(-t * 14);
-      const val = Math.sin(phase) * env * 0.7;
-      addSample(val, val, startIdx + i);
-    }
-  };
-
-  // 스네어 / 클랩 합성기 (Snare + Noise)
-  const renderSnare = (startSec: number) => {
-    const startIdx = Math.floor(startSec * sampleRate);
-    const duration = 0.22;
-    const count = Math.floor(duration * sampleRate);
-
-    for (let i = 0; i < count; i++) {
-      const t = i / sampleRate;
-      // 톤 성분 (200Hz) + 화이트 노이즈
-      const tone = Math.sin(2 * Math.PI * 185 * t) * Math.exp(-t * 22);
-      const noise = (Math.random() * 2 - 1) * Math.exp(-t * 16);
-      const val = (tone * 0.3 + noise * 0.7) * 0.55;
-      addSample(val * 0.95, val * 1.05, startIdx + i);
-    }
-  };
-
-  // 하이햇 (Crisp Hi-hat)
-  const renderHihat = (startSec: number, isOpen = false) => {
-    const startIdx = Math.floor(startSec * sampleRate);
-    const duration = isOpen ? 0.18 : 0.05;
-    const count = Math.floor(duration * sampleRate);
-    const decay = isOpen ? 18 : 60;
-
-    for (let i = 0; i < count; i++) {
-      const t = i / sampleRate;
-      // 노이즈 기반 텍스처
-      const noise = (Math.random() * 2 - 1) * Math.exp(-t * decay);
-      const val = noise * 0.25;
-      addSample(val * 0.8, val * 1.2, startIdx + i);
-    }
-  };
-
-  // 신스 베이스 (Sawtooth Bass)
-  const renderBassNote = (startSec: number, durationSec: number, freq: number) => {
-    const startIdx = Math.floor(startSec * sampleRate);
-    const count = Math.floor(durationSec * sampleRate);
-
-    for (let i = 0; i < count; i++) {
-      const t = i / sampleRate;
-      // 톱니파 + 서브 오실레이터
-      const saw = ((2 * (t * freq - Math.floor(0.5 + t * freq))) * 0.6);
-      const sub = Math.sin(2 * Math.PI * (freq / 2) * t) * 0.4;
-      const env = Math.min(1, t * 50) * Math.exp(-t * 3.5);
-      const val = (saw + sub) * env * 0.45;
-      addSample(val, val, startIdx + i);
-    }
-  };
-
-  // 신스 리드 / 아르페지오 (Square / Lead Synth)
-  const renderLeadNote = (startSec: number, durationSec: number, freq: number, pan = 0) => {
-    const startIdx = Math.floor(startSec * sampleRate);
-    const count = Math.floor(durationSec * sampleRate);
-
-    for (let i = 0; i < count; i++) {
-      const t = i / sampleRate;
-      // 펄스파 + 딜레이 느낌
-      const pulse = Math.sin(2 * Math.PI * freq * t) > 0 ? 0.6 : -0.6;
-      const soft = Math.sin(2 * Math.PI * freq * 2 * t) * 0.2;
-      const env = Math.min(1, t * 80) * Math.exp(-t * 4);
-      const val = (pulse + soft) * env * 0.35;
-
-      const leftPan = 0.5 * (1 - pan);
-      const rightPan = 0.5 * (1 + pan);
-      addSample(val * leftPan, val * rightPan, startIdx + i);
-    }
-  };
-
-  // 음계 주파수 테이블 (A minor / C major 펜타토닉 및 화음)
-  const NOTES = {
-    A1: 55, C2: 65.4, D2: 73.4, E2: 82.4, F2: 87.3, G2: 98,
-    A2: 110, C3: 130.8, D3: 146.8, E3: 164.8, F3: 174.6, G3: 196,
-    A3: 220, B3: 246.9, C4: 261.6, D4: 293.7, E4: 329.6, F4: 349.2, G4: 392,
-    A4: 440, B4: 493.9, C5: 523.3, D5: 587.3, E5: 659.3, G5: 784
-  };
-
-  // 트랙 시퀀싱 (마디별 루프 배치)
-  const bassRiff = [NOTES.A1, NOTES.A1, NOTES.F2, NOTES.G2];
-  const melodyNotes = [
-    NOTES.A4, NOTES.C5, NOTES.E5, NOTES.D5,
-    NOTES.C5, NOTES.A4, NOTES.G4, NOTES.E4,
-    NOTES.F4, NOTES.A4, NOTES.C5, NOTES.B4,
-    NOTES.G4, NOTES.E4, NOTES.D4, NOTES.E4
-  ];
-
-  for (let bar = 0; bar < totalBars; bar++) {
-    const barStartTime = bar * barSec;
-    const currentBassFreq = bassRiff[bar % bassRiff.length];
-
-    // 4비트 드럼
-    for (let beat = 0; beat < 4; beat++) {
-      const beatTime = barStartTime + beat * beatSec;
-
-      // 4온더플로어 킥
-      renderKick(beatTime);
-
-      // 2, 4박 스네어
-      if (beat === 1 || beat === 3) {
-        renderSnare(beatTime);
-      }
-
-      // 8비트 하이햇
-      renderHihat(beatTime, false);
-      renderHihat(beatTime + beatSec * 0.5, beat === 3);
-
-      // 8비트 롤링 베이스
-      renderBassNote(beatTime, beatSec * 0.45, currentBassFreq);
-      renderBassNote(beatTime + beatSec * 0.5, beatSec * 0.45, currentBassFreq * 1.5);
-    }
-
-    // 16비트 신스 리드 아르페지오 (2마디 이후부터 진입)
-    if (bar >= 2) {
-      for (let step = 0; step < 8; step++) {
-        const stepTime = barStartTime + step * (beatSec * 0.5);
-        const melIdx = (bar * 8 + step) % melodyNotes.length;
-        const melFreq = melodyNotes[melIdx];
-        const pan = (step % 2 === 0 ? -0.3 : 0.3);
-        renderLeadNote(stepTime, beatSec * 0.6, melFreq, pan);
-      }
-    }
-  }
-
-  // 버퍼 마스터링 (클리핑 방지 노멀라이즈)
-  let maxAmp = 0;
-  for (let i = 0; i < totalSamples; i++) {
-    const aL = Math.abs(left[i]);
-    const aR = Math.abs(right[i]);
-    if (aL > maxAmp) maxAmp = aL;
-    if (aR > maxAmp) maxAmp = aR;
-  }
-  if (maxAmp > 0.85) {
-    const scale = 0.85 / maxAmp;
-    for (let i = 0; i < totalSamples; i++) {
-      left[i] *= scale;
-      right[i] *= scale;
-    }
-  }
-
-  return buffer;
-}
+export const ALBUM_CATEGORIES: ('ALL' | SongAlbum)[] = [
+  'ALL',
+  '結束バンド',
+  'Re:結束バンド',
+  'We will',
+  '結束バンドの歌ってみた',
+  '光の中へ'
+];
 
 export type ChartStyle = 'jrock' | 'punk' | 'funk' | 'guitarhero' | 'mathrock' | 'ballad' | 'shoegaze' | 'poppunk' | 'edm';
 
@@ -1070,6 +899,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 190,
     genre: 'J-Rock / Anime',
+    album: '結束バンド',
     jacketColor1: '#ff5b99',
     jacketColor2: '#ffe600',
     jacketUrl: '/images/청춘 콤플렉스.jpg',
@@ -1082,6 +912,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 195,
     genre: 'Pop Punk / J-Rock',
+    album: '結束バンド',
     jacketColor1: '#ffb703',
     jacketColor2: '#fb8500',
     jacketUrl: '/images/Distortion!!.jpg',
@@ -1094,6 +925,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 124,
     genre: 'City Pop / Funk Rock',
+    album: '結束バンド',
     jacketColor1: '#00f0ff',
     jacketColor2: '#ff2a6d',
     jacketUrl: '/images/별자리가 될 수 있다면.jpg',
@@ -1106,6 +938,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 192,
     genre: 'J-Rock / Alternative',
+    album: '結束バンド',
     jacketColor1: '#3a86ff',
     jacketColor2: '#ff006e',
     jacketUrl: '/images/결속밴드.jpg',
@@ -1118,6 +951,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 180,
     genre: 'Indie Rock / Pop Rock',
+    album: '結束バンド',
     jacketColor1: '#06d6a0',
     jacketColor2: '#ffd166',
     jacketUrl: '/images/결속밴드.jpg',
@@ -1130,6 +964,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 193,
     genre: 'Alternative Rock / Punk',
+    album: '結束バンド',
     jacketColor1: '#0048ff',
     jacketColor2: '#00f5d4',
     jacketUrl: '/images/기타와 고독과 푸른 행성.jpg',
@@ -1142,6 +977,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 186,
     genre: 'Garage Rock / J-Rock',
+    album: '結束バンド',
     jacketColor1: '#8338ec',
     jacketColor2: '#ff0054',
     jacketUrl: '/images/결속밴드.jpg',
@@ -1154,6 +990,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 190,
     genre: 'Post-Punk / Math Rock',
+    album: '結束バンド',
     jacketColor1: '#ffffff',
     jacketColor2: '#9d4edd',
     jacketUrl: '/images/그 밴드.jpg',
@@ -1166,6 +1003,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 190,
     genre: 'Math Rock / Indie Rock',
+    album: '結束バンド',
     jacketColor1: '#0055ff',
     jacketColor2: '#f4a261',
     jacketUrl: '/images/달각달각.jpg',
@@ -1178,6 +1016,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 94,
     genre: 'Indie Pop / Ballad',
+    album: '結束バンド',
     jacketColor1: '#0077b6',
     jacketColor2: '#90e0ef',
     jacketUrl: '/images/결속밴드.jpg',
@@ -1190,6 +1029,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 122,
     genre: 'Pop Rock / Anime Pop',
+    album: '結束バンド',
     jacketColor1: '#ffd000',
     jacketColor2: '#ff007f',
     jacketUrl: '/images/뭐가 나빠.jpg',
@@ -1202,6 +1042,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 184,
     genre: 'Power Pop / Punk Rock',
+    album: '結束バンド',
     jacketColor1: '#ff0055',
     jacketColor2: '#ffbe0b',
     jacketUrl: '/images/잊어주지 않을 거야.jpg',
@@ -1214,6 +1055,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 77,
     genre: 'Shoegaze / Alternative',
+    album: '結束バンド',
     jacketColor1: '#e0aaff',
     jacketColor2: '#3c096c',
     jacketUrl: '/images/결속밴드.jpg',
@@ -1226,6 +1068,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 150,
     genre: 'Alternative Rock / Cover',
+    album: '結束バンド',
     jacketColor1: '#ff758f',
     jacketColor2: '#48cae4',
     jacketUrl: '/images/구르는 바위, 네게 아침이 내린다.jpg',
@@ -1238,6 +1081,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 196,
     genre: 'Alternative Rock / J-Rock',
+    album: '光の中へ',
     jacketColor1: '#fff3b0',
     jacketColor2: '#ff007f',
     jacketUrl: '/images/빛 속으로.jpg',
@@ -1250,6 +1094,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 165,
     genre: 'J-Rock / Youth Pop',
+    album: '光の中へ',
     jacketColor1: '#ff7b00',
     jacketColor2: '#00b4d8',
     jacketUrl: '/images/빛 속으로.jpg',
@@ -1262,6 +1107,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 182,
     genre: 'J-Rock / Guitar Pop',
+    album: 'Re:結束バンド',
     jacketColor1: '#ff2a6d',
     jacketColor2: '#05d9e8',
     jacketUrl: '/images/결속밴드6.png',
@@ -1274,6 +1120,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 174,
     genre: 'Power Pop / J-Rock',
+    album: 'Re:結束バンド',
     jacketColor1: '#ffbe0b',
     jacketColor2: '#3a86ff',
     jacketUrl: '/images/결속밴드6.png',
@@ -1286,6 +1133,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 154,
     genre: 'Alternative Rock / Cover',
+    album: 'Re:結束バンド',
     jacketColor1: '#ff758f',
     jacketColor2: '#4361ee',
     jacketUrl: '/images/결속밴드3.png',
@@ -1299,6 +1147,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 192,
     genre: 'Alternative Rock / Punk',
+    album: 'Re:結束バンド',
     jacketColor1: '#b5179e',
     jacketColor2: '#00f5d4',
     jacketUrl: '/images/결속밴드3.png',
@@ -1311,6 +1160,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 188,
     genre: 'Post-Punk / Garage Rock',
+    album: 'Re:結束バンド',
     jacketColor1: '#ffaa00',
     jacketColor2: '#7b2cbf',
     jacketUrl: '/images/결속밴드2.png',
@@ -1323,6 +1173,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 186,
     genre: 'Anime Rock / Pop Rock',
+    album: 'Re:結束バンド',
     jacketColor1: '#ffd166',
     jacketColor2: '#5e60ce',
     jacketUrl: '/images/결속밴드2.png',
@@ -1335,6 +1186,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 144,
     genre: 'Alternative Rock / J-Rock',
+    album: 'We will',
     jacketColor1: '#ff4d6d',
     jacketColor2: '#a2d2ff',
     jacketUrl: '/images/결속밴드4.png',
@@ -1347,6 +1199,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 200,
     genre: 'Melodic Punk / Fast Rock',
+    album: 'We will',
     jacketColor1: '#ffb703',
     jacketColor2: '#fb5607',
     jacketUrl: '/images/결속밴드4.png',
@@ -1359,6 +1212,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 180,
     genre: 'Indie Rock / Post-Punk',
+    album: 'We will',
     jacketColor1: '#3a0ca3',
     jacketColor2: '#4cc9f0',
     jacketUrl: '/images/결속밴드4.png',
@@ -1371,6 +1225,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '結束バンド',
     bpm: 130,
     genre: 'Indie Pop / Guitar Rock',
+    album: 'We will',
     jacketColor1: '#7209b7',
     jacketColor2: '#fee440',
     jacketUrl: '/images/결속밴드4.png',
@@ -1383,6 +1238,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: 'SAKURA*TRICK',
     bpm: 135,
     genre: 'Anime Pop / Denpa',
+    album: '結束バンドの歌ってみた',
     jacketColor1: '#ff70a6',
     jacketColor2: '#70d6ff',
     jacketUrl: '/images/결속밴드5.png',
@@ -1395,6 +1251,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '亜咲花',
     bpm: 100,
     genre: 'Soul Pop / Anime',
+    album: '結束バンドの歌ってみた',
     jacketColor1: '#ff9f1c',
     jacketColor2: '#2ec4b6',
     jacketUrl: '/images/결속밴드5.png',
@@ -1407,6 +1264,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: 'やすなとソーニャ',
     bpm: 152,
     genre: 'Chaos Denpa / Pop Punk',
+    album: '結束バンドの歌ってみた',
     jacketColor1: '#70e000',
     jacketColor2: '#ff0054',
     jacketUrl: '/images/결속밴드5.png',
@@ -1419,6 +1277,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: "Petit Rabbit's",
     bpm: 172,
     genre: 'Kawaii Pop / Anime Jazz',
+    album: '結束バンドの歌ってみた',
     jacketColor1: '#ff85a1',
     jacketColor2: '#a0c4ff',
     jacketUrl: '/images/결속밴드5.png',
@@ -1431,6 +1290,7 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     artist: '桜高軽音部',
     bpm: 170,
     genre: 'J-Rock / Pop Punk',
+    album: '結束バンドの歌ってみた',
     jacketColor1: '#ff0055',
     jacketColor2: '#ffbe0b',
     jacketUrl: '/images/결속밴드5.png',
@@ -1438,43 +1298,9 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     charts: createStandardCharts(170, 177, 'punk', 0.200)
   }
 ];
-
 /**
- * 기본 탑재 수록곡 목록
+ * 기본 탑재 수록곡 목록 (총 31곡 결속밴드 및 애니메이션 수록곡)
  */
 export const SONG_DATABASE: SongInfo[] = [
-  ...BOCCHI_TRACKS,
-  {
-    id: 'cyber-velocity',
-    title: 'CYBER VELOCITY',
-    artist: 'NEON MATRIX',
-    bpm: 145,
-    genre: 'SYNTHWAVE',
-    jacketColor1: '#00f0ff',
-    jacketColor2: '#ff0077',
-    generateAudioBuffer: (ctx) => createSynthwaveTrack(ctx, 145, 20), // 약 33초
-    charts: createStandardCharts(145, 20, 'edm')
-  },
-  {
-    id: 'neon-pulse',
-    title: 'NEON PULSE',
-    artist: 'DIGITAL DRIFT',
-    bpm: 168,
-    genre: 'ELECTRO DnB',
-    jacketColor1: '#ffe600',
-    jacketColor2: '#9d00ff',
-    generateAudioBuffer: (ctx) => createSynthwaveTrack(ctx, 168, 22), // 약 31초
-    charts: createStandardCharts(168, 22, 'edm')
-  },
-  {
-    id: 'stellar-horizon',
-    title: 'STELLAR HORIZON',
-    artist: 'ASTRAL ECHO',
-    bpm: 132,
-    genre: 'FUTURE TRANCE',
-    jacketColor1: '#00ff66',
-    jacketColor2: '#0088ff',
-    generateAudioBuffer: (ctx) => createSynthwaveTrack(ctx, 132, 18), // 약 32초
-    charts: createStandardCharts(132, 18, 'edm')
-  }
+  ...BOCCHI_TRACKS
 ];

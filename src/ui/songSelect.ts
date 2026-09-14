@@ -1,5 +1,5 @@
-import { SONG_DATABASE } from '../data/songs';
-import { SongInfo, KeyMode, Difficulty } from '../engine/types';
+import { SONG_DATABASE, ALBUM_CATEGORIES } from '../data/songs';
+import { SongInfo, KeyMode, Difficulty, PlayMods, SongAlbum } from '../engine/types';
 import { AudioManager } from '../engine/audio';
 
 export interface SongSelectConfig {
@@ -8,6 +8,7 @@ export interface SongSelectConfig {
   difficulty: Difficulty;
   speed: number;
   offsetMs: number;
+  mods: PlayMods;
 }
 
 export class SongSelectUI {
@@ -27,12 +28,16 @@ export class SongSelectUI {
   private highscoreValEl: HTMLElement;
   private highrankValEl: HTMLElement;
   private playBtn: HTMLElement;
+  private trackCountBadgeEl: HTMLElement | null;
+  private categoryTabsEl: HTMLElement | null;
 
   private selectedSongIndex = 0;
   private keyMode: KeyMode = '4K';
   private difficulty: Difficulty = 'NORMAL';
   private speed = 2.5;
   private offsetMs = 0;
+  private activeCategory: 'ALL' | SongAlbum = 'ALL';
+  private mods: PlayMods = { mirror: false, random: false, autoPlay: false };
 
   private onStartGameCallback: ((config: SongSelectConfig) => void) | null = null;
 
@@ -53,9 +58,12 @@ export class SongSelectUI {
     this.highscoreValEl = document.getElementById('val-highscore')!;
     this.highrankValEl = document.getElementById('val-highrank')!;
     this.playBtn = document.getElementById('btn-play-game')!;
+    this.trackCountBadgeEl = document.getElementById('track-count-badge');
+    this.categoryTabsEl = document.getElementById('category-tabs');
 
     this.loadPreferences();
     this.setupEvents();
+    this.renderCategoryTabs();
     this.renderTrackList();
     this.updateTrackDetails();
   }
@@ -78,18 +86,31 @@ export class SongSelectUI {
     this.updateTrackDetails();
   }
 
+  public getFilteredSongs(): SongInfo[] {
+    if (this.activeCategory === 'ALL') {
+      return SONG_DATABASE;
+    }
+    return SONG_DATABASE.filter(song => song.album === this.activeCategory);
+  }
+
   private loadPreferences() {
     try {
       const savedSpeed = localStorage.getItem('CYBERBEAT_SPEED');
       if (savedSpeed) this.speed = parseFloat(savedSpeed);
       const savedOffset = localStorage.getItem('CYBERBEAT_OFFSET');
       if (savedOffset) this.offsetMs = parseInt(savedOffset, 10);
+      
+      const savedMirror = localStorage.getItem('CYBERBEAT_MOD_MIRROR') === 'true';
+      const savedRandom = localStorage.getItem('CYBERBEAT_MOD_RANDOM') === 'true';
+      const savedAutoPlay = localStorage.getItem('CYBERBEAT_MOD_AUTOPLAY') === 'true';
+      this.mods = { mirror: savedMirror, random: savedRandom, autoPlay: savedAutoPlay };
     } catch {
       // ignore
     }
     this.speedValEl.textContent = `${this.speed.toFixed(1)}x`;
     this.offsetValEl.textContent = `${this.offsetMs > 0 ? '+' : ''}${this.offsetMs}ms`;
     this.updateVolumeDisplay();
+    this.updateModsDisplay();
   }
 
   public updateVolumeDisplay() {
@@ -97,6 +118,16 @@ export class SongSelectUI {
     const hitPct = Math.round(this.audioManager.getHitsoundVolume() * 100);
     if (this.bgmVolValEl) this.bgmVolValEl.textContent = `${bgmPct}%`;
     if (this.hitVolValEl) this.hitVolValEl.textContent = `${hitPct}%`;
+  }
+
+  private updateModsDisplay() {
+    const mirrorBtn = document.getElementById('btn-mod-mirror');
+    const randomBtn = document.getElementById('btn-mod-random');
+    const autoPlayBtn = document.getElementById('btn-mod-autoplay');
+
+    mirrorBtn?.classList.toggle('active', this.mods.mirror);
+    randomBtn?.classList.toggle('active', this.mods.random);
+    autoPlayBtn?.classList.toggle('active', this.mods.autoPlay);
   }
 
   private setupEvents() {
@@ -193,25 +224,107 @@ export class SongSelectUI {
       }
     });
 
+    // 모드(MODS) 버튼 토글
+    document.getElementById('btn-mod-mirror')?.addEventListener('click', () => {
+      this.mods.mirror = !this.mods.mirror;
+      if (this.mods.mirror) {
+        this.mods.random = false;
+      }
+      localStorage.setItem('CYBERBEAT_MOD_MIRROR', this.mods.mirror.toString());
+      localStorage.setItem('CYBERBEAT_MOD_RANDOM', this.mods.random.toString());
+      this.updateModsDisplay();
+      this.audioManager.playHitSound('tap');
+    });
+
+    document.getElementById('btn-mod-random')?.addEventListener('click', () => {
+      this.mods.random = !this.mods.random;
+      if (this.mods.random) {
+        this.mods.mirror = false;
+      }
+      localStorage.setItem('CYBERBEAT_MOD_MIRROR', this.mods.mirror.toString());
+      localStorage.setItem('CYBERBEAT_MOD_RANDOM', this.mods.random.toString());
+      this.updateModsDisplay();
+      this.audioManager.playHitSound('tap');
+    });
+
+    document.getElementById('btn-mod-autoplay')?.addEventListener('click', () => {
+      this.mods.autoPlay = !this.mods.autoPlay;
+      localStorage.setItem('CYBERBEAT_MOD_AUTOPLAY', this.mods.autoPlay.toString());
+      this.updateModsDisplay();
+      this.audioManager.playHitSound('tap');
+    });
+
     // 시작 버튼
     this.playBtn.addEventListener('click', () => {
-      if (this.onStartGameCallback) {
+      const songs = this.getFilteredSongs();
+      const song = songs[this.selectedSongIndex] || songs[0];
+      if (this.onStartGameCallback && song) {
         this.onStartGameCallback({
-          selectedSong: SONG_DATABASE[this.selectedSongIndex],
+          selectedSong: song,
           keyMode: this.keyMode,
           difficulty: this.difficulty,
           speed: this.speed,
-          offsetMs: this.offsetMs
+          offsetMs: this.offsetMs,
+          mods: { ...this.mods }
         });
       }
     });
+  }
 
+  private renderCategoryTabs() {
+    if (!this.categoryTabsEl) return;
 
+    // 각 카테고리별 곡 수 계산
+    const counts: Record<string, number> = {
+      ALL: SONG_DATABASE.length
+    };
+    for (const song of SONG_DATABASE) {
+      if (song.album) {
+        counts[song.album] = (counts[song.album] || 0) + 1;
+      }
+    }
+
+    this.categoryTabsEl.querySelectorAll('.cat-tab').forEach(btn => {
+      const cat = (btn as HTMLElement).dataset.cat as ('ALL' | SongAlbum);
+      if (cat) {
+        const count = counts[cat] || 0;
+        const displayName = cat === 'ALL' ? '전체' : (cat === '結束バンドの歌ってみた' ? '歌ってみた' : cat);
+        btn.textContent = `${displayName} (${count})`;
+
+        btn.addEventListener('click', () => {
+          if (this.activeCategory === cat) return;
+
+          const currentSong = this.getFilteredSongs()[this.selectedSongIndex];
+          this.activeCategory = cat;
+
+          this.categoryTabsEl?.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          const newFiltered = this.getFilteredSongs();
+          const foundIdx = newFiltered.findIndex(s => s.id === currentSong?.id);
+          this.selectedSongIndex = foundIdx >= 0 ? foundIdx : 0;
+
+          this.renderTrackList();
+          this.updateTrackDetails();
+          this.audioManager.playHitSound('tap');
+        });
+      }
+    });
   }
 
   private renderTrackList() {
+    const songs = this.getFilteredSongs();
     this.trackListEl.innerHTML = '';
-    SONG_DATABASE.forEach((song, idx) => {
+
+    if (this.trackCountBadgeEl) {
+      this.trackCountBadgeEl.textContent = `${songs.length} TRACKS`;
+    }
+
+    if (this.selectedSongIndex >= songs.length) {
+      this.selectedSongIndex = 0;
+    }
+
+    songs.forEach((song, idx) => {
       const item = document.createElement('div');
       item.className = `track-item ${idx === this.selectedSongIndex ? 'selected' : ''}`;
 
@@ -235,7 +348,7 @@ export class SongSelectUI {
       if (song.artist.includes('結束バンド')) {
         const badge = document.createElement('span');
         badge.className = 'kessoku-badge';
-        badge.textContent = '★ 結束BAND';
+        badge.textContent = song.album ? `★ ${song.album}` : '★ 結束BAND';
         badge.style.cssText = 'background: rgba(255, 107, 157, 0.25); color: #ff6b9d; border: 1px solid #ff6b9d; font-size: 0.65rem; padding: 2px 6px; border-radius: 3px; margin-left: 8px; font-weight: 800; display: inline-block; vertical-align: middle;';
         title.appendChild(badge);
       }
@@ -261,7 +374,8 @@ export class SongSelectUI {
   }
 
   private updateTrackDetails() {
-    const song = SONG_DATABASE[this.selectedSongIndex];
+    const songs = this.getFilteredSongs();
+    const song = songs[this.selectedSongIndex] || songs[0];
     if (!song) return;
 
     if (song.jacketUrl) {
@@ -281,7 +395,8 @@ export class SongSelectUI {
   }
 
   private updateHighScoreDisplay() {
-    const song = SONG_DATABASE[this.selectedSongIndex];
+    const songs = this.getFilteredSongs();
+    const song = songs[this.selectedSongIndex];
     if (!song) return;
 
     const recordKey = `RECORD_${song.id}_${this.keyMode}_${this.difficulty}`;

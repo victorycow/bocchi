@@ -335,14 +335,70 @@ body, html {
   overflow: hidden;
 }
 
+.panel-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+}
+
 .panel-title {
-  padding: 1rem;
   font-family: var(--font-display);
   font-size: 1rem;
   font-weight: 700;
   color: var(--neon-cyan);
-  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
   letter-spacing: 2px;
+}
+
+.track-count-badge {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(0, 240, 255, 0.15);
+  color: var(--neon-cyan);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+}
+
+/* 앨범별 카테고리 탭 */
+.category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.6rem 0.8rem;
+  background: rgba(10, 15, 28, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cat-tab {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 5px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  white-space: nowrap;
+}
+
+.cat-tab:hover {
+  border-color: var(--neon-cyan);
+  color: #fff;
+  background: rgba(0, 240, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.cat-tab.active {
+  background: linear-gradient(135deg, rgba(255, 107, 157, 0.3), rgba(0, 240, 255, 0.3));
+  border-color: var(--bocchi-pink);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(255, 107, 157, 0.4);
+  text-shadow: 0 0 6px var(--bocchi-pink-glow);
 }
 
 .track-list {
@@ -530,6 +586,99 @@ body, html {
   color: #fff;
   box-shadow: 0 0 16px rgba(255, 0, 85, 0.85), 0 0 24px rgba(157, 0, 255, 0.6);
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+}
+
+/* 플레이 모드 (MODS) 버튼 */
+.mods-group {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.mod-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-muted);
+  padding: 8px 10px;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  letter-spacing: 0.5px;
+}
+
+.mod-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.mod-btn.active[data-mod="mirror"] {
+  background: linear-gradient(135deg, #00f0ff 0%, #0077ff 100%);
+  border-color: #00f0ff;
+  color: #000;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.7);
+}
+
+.mod-btn.active[data-mod="random"] {
+  background: linear-gradient(135deg, #ff0077 0%, #9d00ff 100%);
+  border-color: #ff0077;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(255, 0, 119, 0.8);
+}
+
+.mod-btn.active[data-mod="autoPlay"] {
+  background: linear-gradient(135deg, #ffd700 0%, #ff8800 100%);
+  border-color: #ffd700;
+  color: #000;
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.85);
+  animation: gold-pulse 1.8s infinite alternate;
+}
+
+@keyframes gold-pulse {
+  0% { box-shadow: 0 0 8px rgba(255, 215, 0, 0.6); }
+  100% { box-shadow: 0 0 20px rgba(255, 215, 0, 1); }
+}
+
+.mods-badge {
+  background: linear-gradient(135deg, rgba(255, 0, 119, 0.25), rgba(0, 240, 255, 0.25));
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+}
+
+.hud-autoplay-banner {
+  position: absolute;
+  top: 75px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 50;
+}
+
+.auto-pulse {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #ffd700;
+  text-shadow: 0 0 12px rgba(255, 215, 0, 0.9);
+  background: rgba(10, 15, 30, 0.85);
+  border: 1px solid #ffd700;
+  padding: 6px 18px;
+  border-radius: 20px;
+  letter-spacing: 2px;
+  animation: auto-glow 1s infinite alternate;
+}
+
+@keyframes auto-glow {
+  0% { transform: scale(0.97); opacity: 0.85; }
+  100% { transform: scale(1.03); opacity: 1; }
 }
 
 .stepper {
