@@ -105,6 +105,36 @@ export class EditorCanvas {
     return true;
   }
 
+  public deleteNoteById(id: number): boolean {
+    const idx = this.notes.findIndex(n => n.id === id);
+    if (idx >= 0) {
+      this.notes.splice(idx, 1);
+      this.render();
+      this.onNotesChangedCb?.();
+      return true;
+    }
+    return false;
+  }
+
+  public deleteNoteAtPosition(lane: number, rawHoverTime: number, pixelsPerSecond: number): boolean {
+    const idx = this.notes.findIndex(n => {
+      if (n.lane !== lane) return false;
+      if (n.type === 'hold') {
+        return rawHoverTime >= n.time - 0.04 && rawHoverTime <= n.time + n.duration + 0.04;
+      }
+      const distPx = Math.abs(n.time - rawHoverTime) * pixelsPerSecond;
+      return distPx <= 22;
+    });
+
+    if (idx >= 0) {
+      this.notes.splice(idx, 1);
+      this.render();
+      this.onNotesChangedCb?.();
+      return true;
+    }
+    return false;
+  }
+
   public deleteNoteAt(lane: number, time: number, toleranceSec = 0.06): boolean {
     const idx = this.notes.findIndex(
       n => n.lane === lane && Math.abs(n.time - time) < toleranceSec
@@ -153,6 +183,11 @@ export class EditorCanvas {
   }
 
   private setupMouseEvents() {
+    // 캔버스 우클릭 브라우저 메뉴 차단 (우클릭 노트 삭제 전용)
+    this.canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    });
+
     this.canvas.addEventListener('mousemove', (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -171,6 +206,11 @@ export class EditorCanvas {
       const rawHoverTime = this.currentTime + (playheadY - y) / pixelsPerSecond;
       this.hoverTime = this.getSnappedTime(rawHoverTime);
 
+      // 우클릭 드래그 지우개: 우클릭을 누른 상태로 이동 시 지나가는 모든 노트 즉시 삭제
+      if ((e.buttons & 2) === 2 && this.hoverLane !== null) {
+        this.deleteNoteAtPosition(this.hoverLane, rawHoverTime, pixelsPerSecond);
+      }
+
       if (this.isDraggingHold && this.dragHoldStartTime !== null) {
         this.dragHoldCurrentTime = Math.max(this.dragHoldStartTime + 0.05, this.hoverTime);
       }
@@ -188,10 +228,23 @@ export class EditorCanvas {
     });
 
     this.canvas.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return; // Left click only
       const rect = this.canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
+
+      // 우클릭 단타 삭제: 커서 위치의 노트를 즉시 삭제
+      if (e.button === 2) {
+        e.preventDefault();
+        if (x >= this.RULER_WIDTH && this.hoverLane !== null) {
+          const pixelsPerSecond = this.getPixelsPerSecond();
+          const playheadY = this.getPlayheadY(rect.height);
+          const rawHoverTime = this.currentTime + (playheadY - y) / pixelsPerSecond;
+          this.deleteNoteAtPosition(this.hoverLane, rawHoverTime, pixelsPerSecond);
+        }
+        return;
+      }
+
+      if (e.button !== 0) return; // 좌클릭 전용
 
       // 룰러 영역 클릭 시 시크(Seek)
       if (x < this.RULER_WIDTH) {
@@ -207,7 +260,7 @@ export class EditorCanvas {
       const targetLane = this.hoverLane;
       const targetTime = this.hoverTime;
 
-      // 1. 기존 노트 삭제 확인
+      // 1. 기존 노트 좌클릭 시 토글 삭제
       const tolerance = (this.config.bpm > 180 ? 0.07 : 0.05);
       const existing = this.notes.find(n => n.lane === targetLane && Math.abs(n.time - targetTime) < tolerance);
 

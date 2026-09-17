@@ -39,6 +39,22 @@ class ChartEditorApp {
   private clearChartBtn: HTMLButtonElement;
   private resetDefaultBtn: HTMLButtonElement;
 
+  // Clone feature DOM Elements
+  private btnOpenCloneModal: HTMLButtonElement;
+  private cloneModalEl: HTMLElement;
+  private cloneModalBackdrop: HTMLElement;
+  private btnCloseCloneModal: HTMLButtonElement;
+  private modalCloneSongTitle: HTMLElement;
+  private modalCloneCurrentDiff: HTMLElement;
+  private modalSelectCloneFrom: HTMLSelectElement;
+  private modalBtnCloneFrom: HTMLButtonElement;
+  private modalSelectCloneTo: HTMLSelectElement;
+  private modalBtnCloneTo: HTMLButtonElement;
+  private selectCloneFrom: HTMLSelectElement;
+  private btnCloneFrom: HTMLButtonElement;
+  private selectCloneTo: HTMLSelectElement;
+  private btnCloneTo: HTMLButtonElement;
+
   // Sidebar info
   private metaJacketEl: HTMLElement;
   private metaTitleEl: HTMLElement;
@@ -100,6 +116,22 @@ class ChartEditorApp {
     this.copyJsonBtn = document.getElementById('btn-copy-json') as HTMLButtonElement;
     this.clearChartBtn = document.getElementById('btn-clear-chart') as HTMLButtonElement;
     this.resetDefaultBtn = document.getElementById('btn-reset-default') as HTMLButtonElement;
+
+    // Clone elements
+    this.btnOpenCloneModal = document.getElementById('btn-open-clone-modal') as HTMLButtonElement;
+    this.cloneModalEl = document.getElementById('clone-modal') as HTMLElement;
+    this.cloneModalBackdrop = document.getElementById('clone-modal-backdrop') as HTMLElement;
+    this.btnCloseCloneModal = document.getElementById('btn-close-clone-modal') as HTMLButtonElement;
+    this.modalCloneSongTitle = document.getElementById('modal-clone-song-title') as HTMLElement;
+    this.modalCloneCurrentDiff = document.getElementById('modal-clone-current-diff') as HTMLElement;
+    this.modalSelectCloneFrom = document.getElementById('modal-select-clone-from') as HTMLSelectElement;
+    this.modalBtnCloneFrom = document.getElementById('modal-btn-clone-from') as HTMLButtonElement;
+    this.modalSelectCloneTo = document.getElementById('modal-select-clone-to') as HTMLSelectElement;
+    this.modalBtnCloneTo = document.getElementById('modal-btn-clone-to') as HTMLButtonElement;
+    this.selectCloneFrom = document.getElementById('select-clone-from') as HTMLSelectElement;
+    this.btnCloneFrom = document.getElementById('btn-clone-from') as HTMLButtonElement;
+    this.selectCloneTo = document.getElementById('select-clone-to') as HTMLSelectElement;
+    this.btnCloneTo = document.getElementById('btn-clone-to') as HTMLButtonElement;
 
     this.metaJacketEl = document.getElementById('meta-jacket')!;
     this.metaTitleEl = document.getElementById('meta-title')!;
@@ -246,6 +278,7 @@ class ChartEditorApp {
       this.canvasEditor.setNotes([]);
     }
     this.updateStats();
+    this.updateCloneOptions();
   }
 
   private setupEvents() {
@@ -265,12 +298,48 @@ class ChartEditorApp {
       btn.addEventListener('click', () => {
         const diff = btn.dataset.diff as Difficulty;
         if (diff && diff !== this.currentDifficulty) {
+          this.autoSaveCurrent();
           this.currentDifficulty = diff;
           this.diffBtns.forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           this.loadChartForCurrentSelection();
         }
       });
+    });
+
+    // 채보 복사 모달 열기/닫기
+    this.btnOpenCloneModal?.addEventListener('click', () => {
+      this.openCloneModal();
+    });
+
+    this.btnCloseCloneModal?.addEventListener('click', () => {
+      this.closeCloneModal();
+    });
+
+    this.cloneModalBackdrop?.addEventListener('click', () => {
+      this.closeCloneModal();
+    });
+
+    // 모달 내 복사 액션
+    this.modalBtnCloneFrom?.addEventListener('click', () => {
+      const src = this.modalSelectCloneFrom.value as Difficulty;
+      if (src) this.copyFromDifficulty(src);
+    });
+
+    this.modalBtnCloneTo?.addEventListener('click', () => {
+      const tgt = this.modalSelectCloneTo.value as Difficulty;
+      if (tgt) this.copyToDifficulty(tgt);
+    });
+
+    // 사이드바 빠른 복사 액션
+    this.btnCloneFrom?.addEventListener('click', () => {
+      const src = this.selectCloneFrom.value as Difficulty;
+      if (src) this.copyFromDifficulty(src);
+    });
+
+    this.btnCloneTo?.addEventListener('click', () => {
+      const tgt = this.selectCloneTo.value as Difficulty;
+      if (tgt) this.copyToDifficulty(tgt);
     });
 
     // 재생 / 일시정지
@@ -390,6 +459,7 @@ class ChartEditorApp {
     this.clearChartBtn.addEventListener('click', () => {
       if (confirm('현재 채보의 모든 노트를 비우시겠습니까?')) {
         this.canvasEditor.clearNotes();
+        this.updateCloneOptions();
         this.showToast('🗑️ 모든 노트가 삭제되었습니다.');
       }
     });
@@ -400,6 +470,7 @@ class ChartEditorApp {
         localStorage.removeItem(customKey);
         const chartKey = `4K_${this.currentDifficulty}` as const;
         this.canvasEditor.setNotes(this.currentSong.charts[chartKey]?.notes || []);
+        this.updateCloneOptions();
         this.showToast('↺ 기본 채보로 초기화되었습니다.');
       }
     });
@@ -439,6 +510,13 @@ class ChartEditorApp {
       if (this.isTesting) {
         if (e.key === 'Escape') {
           this.stopTestPlay();
+        }
+        return;
+      }
+
+      if (!this.cloneModalEl.classList.contains('hidden')) {
+        if (e.key === 'Escape') {
+          this.closeCloneModal();
         }
         return;
       }
@@ -494,7 +572,166 @@ class ChartEditorApp {
     const notes = this.canvasEditor.getNotes();
     const key = `CUSTOM_CHART_${this.currentSong.id}_4K_${this.currentDifficulty}`;
     localStorage.setItem(key, JSON.stringify(notes));
+    this.updateCloneOptions();
     this.showToast(`💾 "${this.currentSong.title}" [${this.currentDifficulty}] 채보가 메인 게임에 저장되었습니다!`);
+  }
+
+  // =========================================================================
+  // 난이도 채보 복사 / 복제 (Chart Clone Feature)
+  // =========================================================================
+  private getChartForDifficulty(diff: Difficulty): { notes: NoteData[]; isCustom: boolean } {
+    const customKey = `CUSTOM_CHART_${this.currentSong.id}_4K_${diff}`;
+    const saved = localStorage.getItem(customKey);
+    if (saved) {
+      try {
+        const notes = JSON.parse(saved);
+        if (Array.isArray(notes)) {
+          return { notes, isCustom: true };
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    const chartKey = `4K_${diff}` as const;
+    const defaultNotes = this.currentSong.charts[chartKey]?.notes || [];
+    return { notes: defaultNotes, isCustom: false };
+  }
+
+  private updateCloneOptions() {
+    const allDiffs: Difficulty[] = ['EXPERT', 'HARD', 'NORMAL'];
+
+    if (this.modalCloneSongTitle) {
+      this.modalCloneSongTitle.textContent = this.currentSong.title;
+    }
+    if (this.modalCloneCurrentDiff) {
+      this.modalCloneCurrentDiff.textContent = this.currentDifficulty;
+    }
+
+    const renderFrom = (selectEl: HTMLSelectElement) => {
+      if (!selectEl) return;
+      const prevVal = selectEl.value;
+      selectEl.innerHTML = '';
+      allDiffs.forEach(d => {
+        if (d === this.currentDifficulty) return;
+        const chart = this.getChartForDifficulty(d);
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = `${d} (${chart.isCustom ? '★커스텀' : '기본'} ${chart.notes.length}개)`;
+        selectEl.appendChild(opt);
+      });
+      if (selectEl.querySelector(`option[value="${prevVal}"]`)) {
+        selectEl.value = prevVal;
+      } else if (this.currentDifficulty !== 'EXPERT' && selectEl.querySelector('option[value="EXPERT"]')) {
+        selectEl.value = 'EXPERT';
+      }
+    };
+
+    const renderTo = (selectEl: HTMLSelectElement) => {
+      if (!selectEl) return;
+      const prevVal = selectEl.value;
+      selectEl.innerHTML = '';
+      allDiffs.forEach(d => {
+        if (d === this.currentDifficulty) return;
+        const chart = this.getChartForDifficulty(d);
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = `${d} 로 복사 (현재 ${chart.notes.length}개)`;
+        selectEl.appendChild(opt);
+      });
+      if (selectEl.querySelector(`option[value="${prevVal}"]`)) {
+        selectEl.value = prevVal;
+      }
+    };
+
+    renderFrom(this.selectCloneFrom);
+    renderFrom(this.modalSelectCloneFrom);
+    renderTo(this.selectCloneTo);
+    renderTo(this.modalSelectCloneTo);
+  }
+
+  private openCloneModal() {
+    this.updateCloneOptions();
+    this.cloneModalEl.classList.remove('hidden');
+  }
+
+  private closeCloneModal() {
+    this.cloneModalEl.classList.add('hidden');
+  }
+
+  private copyFromDifficulty(sourceDiff: Difficulty) {
+    if (sourceDiff === this.currentDifficulty) return;
+    const sourceInfo = this.getChartForDifficulty(sourceDiff);
+    if (sourceInfo.notes.length === 0) {
+      alert(`[${sourceDiff}] 난이도에 복사할 노트 데이터가 없습니다.`);
+      return;
+    }
+
+    const curNotes = this.canvasEditor.getNotes();
+    if (curNotes.length > 0) {
+      const ok = confirm(
+        `현재 [${this.currentDifficulty}] 채보(${curNotes.length}개 노트)를 덮어씁니다.\n\n` +
+        `[${sourceDiff}] 난이도의 채보(${sourceInfo.notes.length}개 노트)를 복사해올까요?`
+      );
+      if (!ok) return;
+    }
+
+    // Deep clone with new unique IDs
+    const clonedNotes: NoteData[] = sourceInfo.notes.map(n => ({
+      ...n,
+      id: Date.now() + Math.floor(Math.random() * 10000000)
+    }));
+
+    this.canvasEditor.setNotes(clonedNotes);
+    this.updateStats();
+    this.updateCloneOptions();
+    this.closeCloneModal();
+    this.showToast(`📋 [${sourceDiff}] 채보(${clonedNotes.length}개) 복사 완료! 불필요한 노트를 우클릭으로 솎아내세요.`);
+  }
+
+  private copyToDifficulty(targetDiff: Difficulty) {
+    if (targetDiff === this.currentDifficulty) return;
+    const curNotes = this.canvasEditor.getNotes();
+    if (curNotes.length === 0) {
+      alert('현재 캔버스에 복사할 노트가 없습니다.');
+      return;
+    }
+
+    // Deep clone
+    const clonedNotes: NoteData[] = curNotes.map(n => ({
+      ...n,
+      id: Date.now() + Math.floor(Math.random() * 10000000)
+    }));
+
+    // Save directly to target difficulty's localStorage custom chart
+    const targetKey = `CUSTOM_CHART_${this.currentSong.id}_4K_${targetDiff}`;
+    localStorage.setItem(targetKey, JSON.stringify(clonedNotes));
+
+    this.updateCloneOptions();
+    this.closeCloneModal();
+
+    const switchNow = confirm(
+      `[${this.currentDifficulty}] 채보(${clonedNotes.length}개 노트)가 [${targetDiff}]로 성공적으로 복사 저장되었습니다!\n\n` +
+      `지금 바로 [${targetDiff}] 난이도로 전환하여 노트를 편집하시겠습니까?`
+    );
+
+    if (switchNow) {
+      this.currentDifficulty = targetDiff;
+      this.diffBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.diff === targetDiff);
+      });
+      this.loadChartForCurrentSelection();
+      this.showToast(`🚀 [${targetDiff}] 난이도로 전환되었습니다. 노트를 솎아내며 완성하세요!`);
+    } else {
+      this.showToast(`💾 [${targetDiff}] 채보로 복사 저장되었습니다.`);
+    }
+  }
+
+  private autoSaveCurrent() {
+    const notes = this.canvasEditor.getNotes();
+    if (notes.length > 0) {
+      const key = `CUSTOM_CHART_${this.currentSong.id}_4K_${this.currentDifficulty}`;
+      localStorage.setItem(key, JSON.stringify(notes));
+    }
   }
 
   private exportJson() {
