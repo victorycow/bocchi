@@ -81,11 +81,14 @@ class ChartEditorApp {
   private testOverlay: HTMLElement;
   private testGameCanvas: HTMLCanvasElement;
   private btnExitTest: HTMLButtonElement;
+  private btnRestartTest: HTMLButtonElement;
   private testSongTitleEl: HTMLElement;
   private isTesting = false;
   private testJudgement: JudgementEngine | null = null;
   private testRenderer: CanvasRenderer | null = null;
   private testInput: InputManager | null = null;
+  private testStartPerfTime = 0;
+  private testStartAudioTime = 0;
 
   // Toast
   private toastEl: HTMLElement;
@@ -156,6 +159,7 @@ class ChartEditorApp {
     this.testOverlay = document.getElementById('test-overlay')!;
     this.testGameCanvas = document.getElementById('test-game-canvas') as HTMLCanvasElement;
     this.btnExitTest = document.getElementById('btn-exit-test') as HTMLButtonElement;
+    this.btnRestartTest = document.getElementById('btn-restart-test') as HTMLButtonElement;
     this.testSongTitleEl = document.getElementById('test-song-title')!;
 
     this.toastEl = document.getElementById('editor-toast')!;
@@ -191,6 +195,12 @@ class ChartEditorApp {
       this.displayDurationEl.textContent = this.formatTime(this.audio.duration || 0);
     });
 
+    this.audio.addEventListener('error', () => {
+      console.error('[Editor Audio] Load error:', this.audio.error, this.audio.src);
+      const filename = decodeURI(this.audio.src.split('/').pop() || '');
+      this.showToast(`⚠️ 오디오 파일 로드 실패: ${filename}`);
+    });
+
     this.audio.addEventListener('ended', () => {
       this.playPauseBtn.textContent = '▶ PLAY';
       this.recorder.stop();
@@ -211,9 +221,11 @@ class ChartEditorApp {
   private loadCurrentSongData() {
     // 1. 오디오 로드
     const audioUrl = this.getAudioUrlForSong(this.currentSong);
+    console.log('[Editor] Loading audio track:', this.currentSong.title, 'URL:', audioUrl);
     this.audio.src = audioUrl;
     this.audio.currentTime = 0;
     this.audio.playbackRate = 1.0;
+    this.audio.load();
 
     // 2. 메타 정보 업데이트
     this.metaTitleEl.textContent = this.currentSong.title;
@@ -242,12 +254,12 @@ class ChartEditorApp {
   }
 
   private getAudioUrlForSong(song: SongInfo): string {
-    const fn = song.generateAudioBuffer.toString();
-    const match = fn.match(/loadAudioBuffer\(['"]([^'"]+)['"]\)/);
-    if (match && match[1]) {
-      return match[1];
+    if (song.audioUrl) {
+      return song.audioUrl;
     }
-    // Fallback: search standard convention
+    if ((song.generateAudioBuffer as any)?.audioUrl) {
+      return (song.generateAudioBuffer as any).audioUrl;
+    }
     return `/audio/${song.title}.mp3`;
   }
 
@@ -416,6 +428,10 @@ class ChartEditorApp {
       this.stopTestPlay();
     });
 
+    this.btnRestartTest?.addEventListener('click', () => {
+      this.startTestPlay(true);
+    });
+
     // 저장
     this.saveBtn.addEventListener('click', () => {
       this.saveToGame();
@@ -556,8 +572,15 @@ class ChartEditorApp {
   private togglePlay() {
     this.initAudioContext();
     if (this.audio.paused) {
-      this.audio.play();
-      this.playPauseBtn.textContent = '❚❚ PAUSE';
+      const p = this.audio.play();
+      if (p !== undefined) {
+        p.then(() => {
+          this.playPauseBtn.textContent = '❚❚ PAUSE';
+        }).catch(err => {
+          console.error('[Editor] Audio playback failed:', err);
+          this.showToast(`⚠️ 오디오 재생 실패 (${err.message})`);
+        });
+      }
     } else {
       this.audio.pause();
       this.playPauseBtn.textContent = '▶ PLAY';
@@ -804,23 +827,33 @@ class ChartEditorApp {
   // =========================================================================
   // 인게임 즉시 테스트 플레이
   // =========================================================================
-  private startTestPlay() {
+  private startTestPlay(fromStart = false) {
     this.audio.pause();
     this.isTesting = true;
-    this.testSongTitleEl.textContent = `${this.currentSong.title} (${this.currentDifficulty})`;
     this.testOverlay.classList.remove('hidden');
 
+    // 재생 시작 시간 계산:
+    // 캔버스 에디터에서 현재 탐색 중인 위치가 2초 이상이고 fromStart가 아니면,
+    // 그 위치 약 1.2초 전부터 재생하여 방금 작업한 구간의 노트를 바로 테스트할 수 있도록 지원.
+    // fromStart가 true이면 무조건 0부터 시작.
+    const editorCurTime = this.audio.currentTime || 0;
+    const startTime = fromStart ? 0 : (editorCurTime > 2.0 ? Math.max(0, editorCurTime - 1.2) : 0);
+
+    this.testSongTitleEl.textContent = `${this.currentSong.title} (${this.currentDifficulty}) [${this.formatTime(startTime)}]`;
+
     // 캔버스 크기 조정
-    const rect = this.testOverlay.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    this.testGameCanvas.width = rect.width * dpr;
-    this.testGameCanvas.height = (rect.height - 50) * dpr;
+    const rect = this.testGameCanvas.getBoundingClientRect();
+    const w = rect.width || window.innerWidth;
+    const h = rect.height || (window.innerHeight - 50);
 
     this.testJudgement = new JudgementEngine();
     this.testRenderer = new CanvasRenderer(this.testGameCanvas);
+    this.testRenderer.resize(w, h);
+
     this.testInput = new InputManager();
     this.testInput.setMode('4K');
 
+    // 노트 복제
     const notesToPlay = this.canvasEditor.getNotes().map(n => ({ ...n }));
     this.testJudgement.init(
       this.currentSong.title,
@@ -830,25 +863,51 @@ class ChartEditorApp {
       notesToPlay
     );
 
+    // startTime 이전의 노트는 이미 지나간 것으로 처리
+    if (startTime > 0) {
+      this.testJudgement.update(startTime);
+    }
+
     // 키 입력 연동
     this.testInput.onKey((lane, type) => {
+      const curT = this.getTestCurrentTime();
       if (type === 'down') {
-        this.testJudgement?.handleKeyDown(lane, this.audio.currentTime);
+        this.testJudgement?.handleKeyDown(lane, curT);
         this.playTapSound();
       } else {
-        this.testJudgement?.handleKeyUp(lane, this.audio.currentTime);
+        this.testJudgement?.handleKeyUp(lane, curT);
       }
     });
 
-    this.audio.currentTime = 0;
+    // 오디오 위치 설정 및 재생
+    this.audio.currentTime = startTime;
     this.audio.playbackRate = 1.0;
-    this.audio.play();
+    this.testStartPerfTime = performance.now();
+    this.testStartAudioTime = startTime;
+
+    const playPromise = this.audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        console.warn('[Editor Test] Audio playback warning / autoplay policy:', err);
+      });
+    }
+  }
+
+  private getTestCurrentTime(): number {
+    // 오디오가 정상적으로 재생 중이면 audio.currentTime 사용
+    if (!this.audio.paused && !this.audio.ended && this.audio.currentTime > 0) {
+      return this.audio.currentTime;
+    }
+    // 오디오가 일시 정지 상태이거나 자동재생 차단/버퍼링 중이어도
+    // performance.now() 기반 클럭으로 노트가 절대 멈추지 않고 매끄럽게 내려오도록 보장!
+    const elapsed = (performance.now() - this.testStartPerfTime) / 1000;
+    return this.testStartAudioTime + elapsed;
   }
 
   private updateTestPlay() {
     if (!this.testJudgement || !this.testRenderer || !this.testInput) return;
 
-    const t = this.audio.currentTime;
+    const t = this.getTestCurrentTime();
     this.testJudgement.update(t);
 
     const stats = this.testJudgement.getStats();
@@ -865,7 +924,8 @@ class ChartEditorApp {
       newJudgements
     );
 
-    if (this.audio.ended) {
+    const dur = this.audio.duration || 180;
+    if (t >= dur || this.audio.ended) {
       this.stopTestPlay();
     }
   }

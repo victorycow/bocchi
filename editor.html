@@ -222,7 +222,10 @@
     <div id="test-overlay" class="test-overlay hidden">
       <div class="test-modal-header">
         <h2>TEST PLAYING // <span id="test-song-title">곡명</span></h2>
-        <button id="btn-exit-test" class="cyber-btn sm danger">ESC EXIT TEST</button>
+        <div style="display: flex; gap: 8px;">
+          <button id="btn-restart-test" class="cyber-btn sm accent" title="0:00 곡 시작부터 다시 테스트">↺ 0:00 처음부터</button>
+          <button id="btn-exit-test" class="cyber-btn sm danger">ESC EXIT TEST</button>
+        </div>
       </div>
       <div class="test-canvas-wrapper">
         <canvas id="test-game-canvas"></canvas>

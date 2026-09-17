@@ -856,24 +856,28 @@ export function createChartNotes(
 }
 
 // 1. 공통 오디오 로더 헬퍼 (고음질 MP3 최적화)
-const loadAudioBuffer = (filePath: string) => async (ctx: AudioContext): Promise<AudioBuffer> => {
+const loadAudioBuffer = (filePath: string) => {
   const targetPath = filePath.replace(/\.flac$/i, '.mp3');
-  try {
-    const res = await fetch(encodeURI(targetPath));
-    if (res.ok) {
-      const arrayBuffer = await res.arrayBuffer();
-      return await ctx.decodeAudioData(arrayBuffer);
+  const fn = async (ctx: AudioContext): Promise<AudioBuffer> => {
+    try {
+      const res = await fetch(encodeURI(targetPath));
+      if (res.ok) {
+        const arrayBuffer = await res.arrayBuffer();
+        return await ctx.decodeAudioData(arrayBuffer);
+      }
+    } catch {
+      // MP3 로딩 실패 시 원본 경로 시도
     }
-  } catch {
-    // MP3 로딩 실패 시 원본 경로 시도
-  }
 
-  const resOrig = await fetch(encodeURI(filePath));
-  if (!resOrig.ok) {
-    throw new Error(`오디오 파일을 찾을 수 없습니다: ${targetPath} 또는 ${filePath}`);
-  }
-  const arrayBuffer = await resOrig.arrayBuffer();
-  return await ctx.decodeAudioData(arrayBuffer);
+    const resOrig = await fetch(encodeURI(filePath));
+    if (!resOrig.ok) {
+      throw new Error(`오디오 파일을 찾을 수 없습니다: ${targetPath} 또는 ${filePath}`);
+    }
+    const arrayBuffer = await resOrig.arrayBuffer();
+    return await ctx.decodeAudioData(arrayBuffer);
+  };
+  (fn as any).audioUrl = targetPath;
+  return fn;
 };
 
 // 2. 표준 4K/6K 차트 헬퍼 (스타일 및 시작 오프셋 지원)
@@ -1333,6 +1337,14 @@ export const BOCCHI_TRACKS: SongInfo[] = [
     charts: createStandardCharts(170, 177, 'punk', 0.200)
   }
 ];
+
+// 모든 트랙에 audioUrl 명시적 등록 (HTMLAudioElement 및 에디터 직접 재생 지원)
+BOCCHI_TRACKS.forEach(track => {
+  if (!track.audioUrl) {
+    track.audioUrl = (track.generateAudioBuffer as any)?.audioUrl || `/audio/${track.title}.mp3`;
+  }
+});
+
 /**
  * 기본 탑재 수록곡 목록 (총 31곡 결속밴드 및 애니메이션 수록곡)
  */

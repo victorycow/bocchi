@@ -72,10 +72,10 @@ export class CanvasRenderer {
     tryLoad('/images/stage-bg.jpg', '/images/stage-bg.png');
   }
 
-  public resize() {
+  public resize(customWidth?: number, customHeight?: number) {
     const dpr = window.devicePixelRatio || 1;
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
+    this.width = customWidth || window.innerWidth;
+    this.height = customHeight || window.innerHeight;
 
     this.canvas.width = this.width * dpr;
     this.canvas.height = this.height * dpr;

@@ -53,6 +53,7 @@ export interface SongInfo {
   jacketColor1: string;
   jacketColor2: string;
   jacketUrl?: string;
+  audioUrl?: string;
   generateAudioBuffer: (ctx: AudioContext) => AudioBuffer | Promise<AudioBuffer>;
   charts: {
     [key in ChartKey]?: SongChart;
