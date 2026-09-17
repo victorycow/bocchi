@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BOCCHI 4K CHART STUDIO - 결속밴드 채보 에디터</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&family=Orbitron:wght@700;900&family=Rajdhani:wght@600;700&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛠️</text></svg>">
+  <link rel="stylesheet" href="/src/editor/style.css" />
+</head>
+<body>
+  <div id="editor-app">
+    <!-- 상단 툴바 -->
+    <header class="editor-header">
+      <div class="header-left">
+        <a href="/" class="cyber-btn sm" title="메인 게임으로 돌아가기">← GAME</a>
+        <div class="editor-logo">4K CHART STUDIO <span>// KESSOKU</span></div>
+      </div>
+
+      <div class="header-center">
+        <!-- 곡 선택 -->
+        <select id="select-song" class="cyber-select" title="곡 선택"></select>
+
+        <!-- 난이도 선택 -->
+        <div class="btn-group-diff">
+          <button class="diff-btn active" data-diff="NORMAL">NORMAL</button>
+          <button class="diff-btn" data-diff="HARD">HARD</button>
+          <button class="diff-btn" data-diff="EXPERT">EXPERT</button>
+        </div>
+
+        <!-- 재생 컨트롤 -->
+        <div class="transport-controls">
+          <button id="btn-play-pause" class="cyber-btn primary sm" title="재생 / 일시정지 (Space)">▶ PLAY</button>
+          <button id="btn-stop" class="cyber-btn sm" title="정지">■ STOP</button>
+          
+          <!-- 재생 속도 -->
+          <div class="rate-group">
+            <button class="rate-btn" data-rate="0.5">0.5x</button>
+            <button class="rate-btn" data-rate="0.75">0.75x</button>
+            <button class="rate-btn active" data-rate="1.0">1.0x</button>
+          </div>
+
+          <!-- 메트로놈 -->
+          <button id="btn-metronome" class="cyber-btn sm" title="정박 메트로놈">🔔 TICK</button>
+        </div>
+
+        <!-- 그리드 스냅 -->
+        <div class="snap-box">
+          <label>SNAP</label>
+          <select id="select-snap" class="cyber-select sm">
+            <option value="4">1/4 (정박)</option>
+            <option value="8" selected>1/8 (반박)</option>
+            <option value="16">1/16 (16분)</option>
+            <option value="12">1/12 (3연음)</option>
+            <option value="0">FREE (자유)</option>
+          </select>
+        </div>
+
+        <!-- 노트 모드 -->
+        <div class="mode-toggle-group">
+          <button id="btn-mode-normal" class="mode-btn active" title="단타 노트 (클릭)">TAP</button>
+          <button id="btn-mode-hold" class="mode-btn" title="롱노트 (드래그)">HOLD</button>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- 녹음 & 테스트 & 저장 -->
+        <button id="btn-rec" class="cyber-btn sm danger pulse" title="실시간 D/F/J/K 탭 녹음">● REC</button>
+        <button id="btn-test-play" class="cyber-btn sm accent" title="인게임 즉시 테스트 연주">🎮 TEST</button>
+        <button id="btn-save-game" class="cyber-btn sm primary" title="현재 채보를 메인 게임에 즉시 적용">💾 SAVE</button>
+        <button id="btn-export-json" class="cyber-btn sm" title="JSON 파일로 다운로드">📥 EXPORT</button>
+        <button id="btn-import-json" class="cyber-btn sm" title="JSON 파일 불러오기">📂 IMPORT</button>
+        <input type="file" id="file-import-json" accept=".json" style="display: none;" />
+      </div>
+    </header>
+
+    <!-- 메인 워크스페이스 -->
+    <main class="editor-workspace">
+      <!-- 중앙: 4K 캔버스 뷰 -->
+      <div class="canvas-container">
+        <!-- 레인 헤더 안내 (D, F, J, K) -->
+        <div class="lane-header-row">
+          <div class="ruler-header">BAR</div>
+          <div class="lane-header lane-0" title="고토 히토리">D <span>BOCCHI</span></div>
+          <div class="lane-header lane-1" title="이지치 니지카">F <span>NIJIKA</span></div>
+          <div class="lane-header lane-2" title="야마다 료">J <span>RYO</span></div>
+          <div class="lane-header lane-3" title="키타 이쿠요">K <span>KITA</span></div>
+        </div>
+
+        <!-- 4K 타임라인 캔버스 -->
+        <div class="canvas-scroll-wrap" id="canvas-scroll-wrap">
+          <canvas id="editor-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- 우측: 정보 및 컨트롤 사이드바 -->
+      <aside class="editor-sidebar">
+        <!-- 트랙 메타 카드 -->
+        <div class="meta-card">
+          <div class="meta-jacket" id="meta-jacket"></div>
+          <div class="meta-info">
+            <h2 id="meta-title">청춘 콤플렉스</h2>
+            <h3 id="meta-artist">결속밴드</h3>
+            <div class="meta-tags">
+              <span id="meta-bpm" class="tag">BPM 190</span>
+              <span id="meta-genre" class="tag">J-ROCK</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 타임라인 인디케이터 -->
+        <div class="time-card">
+          <div class="time-row">
+            <span class="label">CURRENT TIME</span>
+            <span id="display-time" class="value glow-cyan">00:00.000</span>
+          </div>
+          <div class="time-row">
+            <span class="label">BAR & BEAT</span>
+            <span id="display-bar" class="value glow-yellow">#01 . 1.0</span>
+          </div>
+          <div class="time-row">
+            <span class="label">TOTAL LENGTH</span>
+            <span id="display-duration" class="value">00:00.000</span>
+          </div>
+        </div>
+
+        <!-- 채보 통계 -->
+        <div class="stats-card">
+          <div class="card-title">CHART STATS</div>
+          <div class="stat-grid">
+            <div class="stat-item">
+              <span class="stat-label">TOTAL NOTES</span>
+              <span id="stat-total" class="stat-val glow-pink">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">TAP NOTES</span>
+              <span id="stat-taps" class="stat-val">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">HOLD NOTES</span>
+              <span id="stat-holds" class="stat-val">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">DENSITY (NPS)</span>
+              <span id="stat-nps" class="stat-val">0.0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 오프셋 미세조정 -->
+        <div class="offset-card">
+          <div class="card-title">START OFFSET</div>
+          <div class="offset-stepper">
+            <button id="btn-offset-sub" class="step-btn">-10ms</button>
+            <span id="val-offset" class="step-val">0.410s</span>
+            <button id="btn-offset-add" class="step-btn">+10ms</button>
+          </div>
+          <p class="hint">곡의 첫 비트가 시작되는 싱크 타이밍을 조정합니다.</p>
+        </div>
+
+        <!-- 채보 관리 버튼들 -->
+        <div class="action-card">
+          <button id="btn-copy-json" class="cyber-btn sm" style="width: 100%;">📋 COPY JSON TO CLIPBOARD</button>
+          <button id="btn-clear-chart" class="cyber-btn sm danger" style="width: 100%; margin-top: 6px;">🗑️ CLEAR ALL NOTES</button>
+          <button id="btn-reset-default" class="cyber-btn sm secondary" style="width: 100%; margin-top: 6px;">↺ RESET TO AUTO DEFAULT</button>
+        </div>
+
+        <!-- 단축키 가이드 -->
+        <div class="shortcuts-card">
+          <div class="card-title">KEYBOARD SHORTCUTS</div>
+          <ul class="shortcut-list">
+            <li><kbd>Space</kbd> <span>재생 / 일시정지</span></li>
+            <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> <span>현재 위치에 D, F, J, K 노트 생성</span></li>
+            <li><kbd>Wheel</kbd> <span>타임라인 1비트 스크롤</span></li>
+            <li><kbd>Shift + Wheel</kbd> <span>타임라인 1마디 고속 스크롤</span></li>
+            <li><kbd>클릭</kbd> <span>노트 생성 / 삭제</span></li>
+            <li><kbd>드래그</kbd> <span>롱노트 생성</span></li>
+          </ul>
+        </div>
+      </aside>
+    </main>
+
+    <!-- 하단 전체 오디오 스크러버 -->
+    <footer class="editor-footer">
+      <div class="scrubber-wrap" id="scrubber-wrap">
+        <div class="scrubber-bg"></div>
+        <div class="scrubber-fill" id="scrubber-fill"></div>
+        <div class="scrubber-handle" id="scrubber-handle"></div>
+      </div>
+    </footer>
+
+    <!-- 플로팅 알림 토스트 -->
+    <div id="editor-toast" class="editor-toast"></div>
+
+    <!-- 인게임 테스트 플레이 오버레이 -->
+    <div id="test-overlay" class="test-overlay hidden">
+      <div class="test-modal-header">
+        <h2>TEST PLAYING // <span id="test-song-title">곡명</span></h2>
+        <button id="btn-exit-test" class="cyber-btn sm danger">ESC EXIT TEST</button>
+      </div>
+      <div class="test-canvas-wrapper">
+        <canvas id="test-game-canvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/editor/main.ts"></script>
+</body>
+</html>

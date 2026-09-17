@@ -1,4 +1,4 @@
-import { SONG_DATABASE, ALBUM_CATEGORIES } from '../data/songs';
+import { SONG_DATABASE, ALBUM_CATEGORIES, hasCustomChart } from '../data/songs';
 import { SongInfo, KeyMode, Difficulty, PlayMods, SongAlbum } from '../engine/types';
 import { AudioManager } from '../engine/audio';
 
@@ -374,6 +374,14 @@ export class SongSelectUI {
         badge.textContent = song.album ? `★ ${song.album}` : '★ 結束BAND';
         badge.style.cssText = 'background: rgba(255, 107, 157, 0.25); color: #ff6b9d; border: 1px solid #ff6b9d; font-size: 0.65rem; padding: 2px 6px; border-radius: 3px; margin-left: 8px; font-weight: 800; display: inline-block; vertical-align: middle;';
         title.appendChild(badge);
+      }
+
+      if (hasCustomChart(song.id, '4K', this.difficulty)) {
+        const customBadge = document.createElement('span');
+        customBadge.className = 'custom-chart-badge';
+        customBadge.textContent = '🛠️ CUSTOM';
+        customBadge.style.cssText = 'background: rgba(0, 240, 255, 0.2); color: #00f0ff; border: 1px solid #00f0ff; font-size: 0.65rem; padding: 2px 6px; border-radius: 3px; margin-left: 6px; font-weight: 800; display: inline-block; vertical-align: middle;';
+        title.appendChild(customBadge);
       }
 
       const artist = document.createElement('div');

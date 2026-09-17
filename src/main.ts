@@ -7,6 +7,7 @@ import { CustomSongModal } from './ui/customSongModal';
 import { SongSelectUI, SongSelectConfig } from './ui/songSelect';
 import { ResultScreenUI } from './ui/resultScreen';
 import { SongInfo, KeyMode, Difficulty, PlayMods } from './engine/types';
+import { getActiveChart } from './data/songs';
 
 type GameScreen = 'TITLE' | 'SELECT' | 'GAME' | 'RESULT';
 
@@ -235,9 +236,8 @@ class RhythmGameApp {
     this.input.setMode(this.currentKeyMode);
     this.audio.setOffsetMs(config.offsetMs);
 
-    // 차트 데이터 가져오기
-    const chartKey = `${this.currentKeyMode}_${this.currentDifficulty}` as const;
-    const chart = this.currentSong.charts[chartKey];
+    // 차트 데이터 가져오기 (커스텀 수제 채보 우선 로드)
+    const chart = getActiveChart(this.currentSong, this.currentKeyMode, this.currentDifficulty);
 
     if (!chart || !chart.notes || chart.notes.length === 0) {
       alert('준비 중인 채보입니다.');

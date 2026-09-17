@@ -44,11 +44,11 @@ export class CanvasRenderer {
   private stageBgImg: HTMLImageElement | null = null;
   private stageBgLoaded = false;
 
-  constructor(gameCanvas: HTMLCanvasElement, bgCanvas: HTMLCanvasElement) {
+  constructor(gameCanvas: HTMLCanvasElement, bgCanvas?: HTMLCanvasElement) {
     this.canvas = gameCanvas;
     this.ctx = gameCanvas.getContext('2d')!;
-    this.bgCanvas = bgCanvas;
-    this.bgCtx = bgCanvas.getContext('2d')!;
+    this.bgCanvas = bgCanvas || document.createElement('canvas');
+    this.bgCtx = this.bgCanvas.getContext('2d')!;
 
     this.initStageBackground();
     this.resize();

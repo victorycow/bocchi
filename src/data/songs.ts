@@ -891,6 +891,41 @@ export const createStandardCharts = (
   '6K_EXPERT': { keyMode: '6K', difficulty: 'EXPERT', notes: createChartNotes(bpm, bars, '6K', 'EXPERT', style, startOffsetSec) },
 });
 
+/**
+ * 커스텀 수제 채보가 로컬에 저장되어 있으면 우선 로드하고, 없으면 기본 채보 반환
+ */
+export function getActiveChart(song: SongInfo, keyMode: KeyMode, difficulty: Difficulty): SongChart {
+  try {
+    const customKey = `CUSTOM_CHART_${song.id}_${keyMode}_${difficulty}`;
+    const saved = localStorage.getItem(customKey);
+    if (saved) {
+      const parsedNotes = JSON.parse(saved);
+      if (Array.isArray(parsedNotes) && parsedNotes.length > 0) {
+        return {
+          keyMode,
+          difficulty,
+          notes: parsedNotes
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load custom chart from storage:', e);
+  }
+
+  const chartKey = `${keyMode}_${difficulty}` as const;
+  return song.charts[chartKey] || { keyMode, difficulty, notes: [] };
+}
+
+export function hasCustomChart(songId: string, keyMode: KeyMode, difficulty: Difficulty): boolean {
+  try {
+    const customKey = `CUSTOM_CHART_${songId}_${keyMode}_${difficulty}`;
+    const saved = localStorage.getItem(customKey);
+    return !!saved && JSON.parse(saved).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 // 3. 봇치 더 록! 트랙 리스트
 export const BOCCHI_TRACKS: SongInfo[] = [
   {

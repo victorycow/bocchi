@@ -12,7 +12,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        survival: resolve(__dirname, 'survival.html')
+        survival: resolve(__dirname, 'survival.html'),
+        editor: resolve(__dirname, 'editor.html')
       }
     }
   }
