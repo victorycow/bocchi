@@ -73,7 +73,25 @@ export class SongSelectUI {
   }
 
   public getKeyMode(): KeyMode {
-    return this.keyMode;
+    return '4K';
+  }
+
+  public showToast(message: string) {
+    let toast = document.getElementById('game-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'game-toast';
+      toast.className = 'game-toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.remove('show');
+    void toast.offsetWidth;
+    toast.classList.add('show');
+    clearTimeout((this as any)._toastTimer);
+    (this as any)._toastTimer = setTimeout(() => {
+      toast?.classList.remove('show');
+    }, 2500);
   }
 
   public refreshRecord() {
@@ -167,6 +185,11 @@ export class SongSelectUI {
       btn.addEventListener('click', (e) => {
         const target = e.currentTarget as HTMLElement;
         const mode = target.dataset.mode as KeyMode;
+        if (mode === '6K' || target.classList.contains('locked')) {
+          this.audioManager.playHitSound('tap');
+          this.showToast('🔒 6키 모드는 결속밴드 4인 집중 개발을 위해 잠겨있습니다!');
+          return;
+        }
         if (mode && mode !== this.keyMode) {
           this.keyMode = mode;
           this.keyModeGroup.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));

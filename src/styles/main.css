@@ -577,6 +577,22 @@ body, html {
   box-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
 }
 
+.mode-btn.locked {
+  background: rgba(18, 22, 38, 0.45);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+  position: relative;
+}
+
+.mode-btn.locked:hover {
+  background: rgba(35, 20, 32, 0.6);
+  border-color: rgba(255, 67, 101, 0.6);
+  color: var(--bocchi-pink);
+  box-shadow: none;
+}
+
 .diff-btn.active[data-diff="HARD"] {
   background: var(--neon-pink);
   border-color: var(--neon-pink);
@@ -1168,6 +1184,46 @@ body, html {
   background: var(--neon-pink);
   border-color: var(--neon-pink);
   color: #fff;
+}
+
+.tab-btn.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  color: var(--text-muted);
+}
+
+.tab-btn.locked:hover {
+  border-color: rgba(255, 67, 101, 0.5);
+  color: var(--bocchi-pink);
+}
+
+/* 플로팅 알림 토스트 */
+.game-toast {
+  position: fixed;
+  bottom: 85px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(14, 18, 34, 0.95);
+  border: 1px solid var(--bocchi-pink);
+  box-shadow: 0 0 20px rgba(255, 107, 157, 0.5), inset 0 0 10px rgba(255, 107, 157, 0.2);
+  color: #fff;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 10px 24px;
+  border-radius: 24px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 1000;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(10px);
+}
+
+.game-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .config-guide {

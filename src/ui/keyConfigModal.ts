@@ -30,8 +30,8 @@ export class KeyConfigModal {
     this.setupEvents();
   }
 
-  public open(defaultMode: KeyMode = '4K') {
-    this.currentTab = defaultMode;
+  public open(_defaultMode: KeyMode = '4K') {
+    this.currentTab = '4K';
     this.tempBindings = this.inputManager.getBindings();
     this.listeningLane = null;
     this.updateTabs();
@@ -72,10 +72,14 @@ export class KeyConfigModal {
     });
 
     this.tab6kBtn.addEventListener('click', () => {
-      this.currentTab = '6K';
-      this.listeningLane = null;
-      this.updateTabs();
-      this.renderSlots();
+      const toast = document.getElementById('game-toast');
+      if (toast) {
+        toast.textContent = '🔒 6키 모드는 결속밴드 4인 집중 개발을 위해 잠겨있습니다!';
+        toast.classList.remove('show');
+        void toast.offsetWidth;
+        toast.classList.add('show');
+        setTimeout(() => toast?.classList.remove('show'), 2000);
+      }
     });
   }
 
