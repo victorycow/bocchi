@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>봇치의 사회생활 서바이벌 - ぼっちの社会生活サバイバル RPG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&family=Orbitron:wght@700;900&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎸</text></svg>">
+  <link rel="stylesheet" href="/src/survival/style.css" />
+</head>
+<body>
+  <!-- Ambient & Vignette FX -->
+  <div class="bg-ambient"></div>
+  <div id="panic-overlay" class="panic-overlay"></div>
+
+  <div id="rpg-app">
+    <!-- Top Navbar -->
+    <header class="top-navbar">
+      <div class="nav-title">
+        <span>🎸 봇치의 사회생활 서바이벌</span>
+        <span class="nav-badge">PROTOTYPE</span>
+      </div>
+      <div class="nav-controls">
+        <button id="btn-toggle-sound" class="btn-icon">🔊 소리 켜짐</button>
+      </div>
+    </header>
+
+    <!-- TITLE SCREEN -->
+    <section id="screen-title" class="screen active">
+      <div class="title-hero-card">
+        <div class="title-badge">STARRY SPECIAL PROJECT</div>
+        <h1 class="title-h1">봇치의 사회생활 서바이벌</h1>
+        <p class="title-sub">BOCCHI'S SOCIAL SURVIVAL RPG</p>
+
+        <div class="bocchi-portrait-wrap">
+          <img id="title-bocchi-img" class="bocchi-portrait-img" src="/images/bocchi-nervous.png" alt="고토 히토리" />
+        </div>
+
+        <div class="intro-desc-box">
+          <p><strong>⚠️ 극악의 일상 난이도 경고!</strong></p>
+          <p>평범한 사람들에게는 일상이지만, 방구석 기타 히어로 '고토 히토리'에게는 세계의 종말과도 같은 사회생활!</p>
+          <ul style="margin-top: 8px; margin-left: 18px; font-size: 0.88rem; line-height: 1.6;">
+            <li>체력(HP) 대신 <strong>[멘탈 수치]</strong>! 0이 되면 승인욕구 몬스터로 폭주합니다.</li>
+            <li>대화와 주문을 성공적으로 완수해 <strong>[진척도 100%]</strong>를 달성하세요!</li>
+            <li>위기 상황엔 결속밴드 동료들(키타, 료, 니지카)의 <strong>[어시스트 스킬]</strong>을 소환하세요!</li>
+          </ul>
+        </div>
+
+        <div class="start-action-row">
+          <button id="btn-start-game" class="btn-primary-big">🎸 사회생활 시작하기 (GAME START)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- BATTLE ARENA SCREEN -->
+    <section id="screen-battle" class="screen">
+      <div class="battle-layout">
+        <!-- Stage Header Banner -->
+        <div class="stage-banner">
+          <div class="stage-info-col">
+            <h2 id="stage-title">STAGE 1. 악기점의 시련</h2>
+            <p id="stage-location">오차노미즈 악기 거리 - 뮤직 스토어</p>
+          </div>
+          <div class="turn-indicator" id="turn-badge">TURN 1</div>
+        </div>
+
+        <!-- Duel Zone (Boss vs Bocchi) -->
+        <div class="duel-zone">
+          <!-- Boss Card -->
+          <div class="char-card boss-card" id="boss-card">
+            <div class="card-header-row">
+              <div class="avatar-frame boss-avatar" id="boss-avatar">🎸</div>
+              <div class="char-meta">
+                <h3 id="boss-name">열정 점원 타나카</h3>
+                <p id="boss-role">악기점 베테랑 판매원</p>
+              </div>
+            </div>
+
+            <!-- 대화 진척도 (클리어 게이지) -->
+            <div class="gauge-section">
+              <div class="gauge-row">
+                <div class="gauge-label">
+                  <span>대화 / 주문 진척도</span>
+                  <span id="progress-text" style="color: var(--neon-green)">0%</span>
+                </div>
+                <div class="gauge-bar-bg">
+                  <div id="progress-bar" class="gauge-fill fill-progress" style="width: 0%;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Boss Dialogue Bubble -->
+            <div class="bubble-box boss-bubble" id="boss-dialogue">
+              "어서오세요~! 편하게 둘러보세요! 혹시 찾으시는 부품이나 이펙터 있으신가요?!"
+            </div>
+          </div>
+
+          <!-- Bocchi Card -->
+          <div class="char-card bocchi-card" id="bocchi-card">
+            <div class="card-header-row">
+              <div class="avatar-frame">
+                <img id="bocchi-avatar" src="/images/bocchi-nervous.png" alt="봇치" />
+              </div>
+              <div class="char-meta">
+                <h3>고토 히토리 (봇치)</h3>
+                <p>사회성: 최하 | 기타: 히어로급</p>
+              </div>
+            </div>
+
+            <!-- 봇치 멘탈 & 용기 SP -->
+            <div class="gauge-section">
+              <div class="gauge-row">
+                <div class="gauge-label">
+                  <span>봇치의 멘탈 (Mental HP)</span>
+                  <span id="mental-text" style="color: var(--bocchi-pink)">100 / 100</span>
+                </div>
+                <div class="gauge-bar-bg">
+                  <div id="mental-bar" class="gauge-fill fill-mental" style="width: 100%;"></div>
+                </div>
+              </div>
+
+              <div class="gauge-row" style="margin-top: 4px;">
+                <div class="gauge-label">
+                  <span>용기 게이지 (Courage SP)</span>
+                  <span id="sp-text" style="color: var(--nijika-yellow)">1 / 3</span>
+                </div>
+                <div class="fill-sp" id="sp-container">
+                  <div class="sp-pip active"></div>
+                  <div class="sp-pip"></div>
+                  <div class="sp-pip"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bocchi Thought Bubble -->
+            <div class="bubble-box thought-bubble" id="bocchi-thought">
+              (눈.. 눈이 마주쳤어... 왜 바로 다가오는 거지?! 도망쳐야 하나?!)
+            </div>
+          </div>
+        </div>
+
+        <!-- Battle History Log -->
+        <div class="battle-log-card" id="battle-log">
+          <div class="log-item log-system">★ 일상과의 치열한 사투가 시작되었습니다!</div>
+        </div>
+
+        <!-- Controls: Actions + Assists -->
+        <div class="action-grid-section">
+          <!-- Regular Commands -->
+          <div class="commands-panel">
+            <div class="panel-title-label">
+              <span>행동 커맨드 선택</span>
+              <span id="shield-badge" style="display: none; color: var(--ryo-blue);">🛡️ 방어 태세 중</span>
+            </div>
+            <div class="commands-container">
+              <button class="cmd-btn" id="cmd-speak">
+                <div class="cmd-name">🗣️ 더듬거리며 말하기</div>
+                <div class="cmd-desc">용기를 내어 용건을 꺼냅니다. 진척도 대폭 상승! (멘탈 -10 소폭 스트레스)</div>
+                <div class="cmd-tag">진척도 +25% | 멘탈 -10</div>
+              </button>
+
+              <button class="cmd-btn" id="cmd-defend">
+                <div class="cmd-name">👀 눈 피하기 (방어)</div>
+                <div class="cmd-desc">허공이나 바닥을 응시합니다. 다음 상대 턴의 멘탈 피해 70% 경감!</div>
+                <div class="cmd-tag">멘탈 방어 +70% | SP +1</div>
+              </button>
+
+              <button class="cmd-btn" id="cmd-phone">
+                <div class="cmd-name">📱 스마트폰 보는 척</div>
+                <div class="cmd-desc">카톡 온 척 화면을 보며 심신을 안정시킵니다. (쿨다운 2턴)</div>
+                <div class="cmd-tag" id="phone-cooldown-tag">멘탈 +20 회복</div>
+              </button>
+
+              <button class="cmd-btn" id="cmd-escape">
+                <div class="cmd-name">🏃 도망치기 시도</div>
+                <div class="cmd-desc">탈출을 시도합니다. 성공 시 위기 회피, 실패 시 엄청난 멘탈 충격!</div>
+                <div class="cmd-tag">확률 도박 (하이 리스크)</div>
+              </button>
+
+              <button class="cmd-btn" id="cmd-guitar-hero" style="grid-column: span 2;">
+                <div class="cmd-name">🎸 기타 히어로 각성 (SP 2 소모)</div>
+                <div class="cmd-desc">뇌내에서 초절 기교 속주를 울리며 명확한 발음으로 주문을 관철합니다!</div>
+                <div class="cmd-tag">진척도 +45% | 멘탈 +10 회복 | SP 2 필요</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Assist Skills (Kessoku Band) -->
+          <div class="assists-panel">
+            <div class="panel-title-label">
+              <span>결속밴드 동료 어시스트</span>
+              <span>각 1회 한정</span>
+            </div>
+            <div class="assists-container">
+              <button class="assist-btn" id="assist-kita">
+                <div class="assist-thumb">
+                  <img src="/images/kita-chibi.png" alt="키타" />
+                </div>
+                <div class="assist-info">
+                  <h4>키타앙~☆ 인싸 광역 섬광</h4>
+                  <p>점원을 매혹하고 대신 주문! 진척도 +40%</p>
+                </div>
+              </button>
+
+              <button class="assist-btn" id="assist-ryo">
+                <div class="assist-thumb">
+                  <img src="/images/ryo-chibi.png" alt="료" />
+                </div>
+                <div class="assist-info">
+                  <h4>료의 기행 & 잡초 쉴드</h4>
+                  <p>"돈 빌려줘." 상대를 당황시켜 2턴 무력화</p>
+                </div>
+              </button>
+
+              <button class="assist-btn" id="assist-nijika">
+                <div class="assist-thumb">
+                  <img src="/images/nijika-chibi.png" alt="니지카" />
+                </div>
+                <div class="assist-info">
+                  <h4>니지카의 대천사 케어</h4>
+                  <p>"괜찮아!" 멘탈 +40 회복 및 SP +1</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VICTORY MODAL -->
+    <div id="modal-victory" class="modal-overlay">
+      <div class="modal-card modal-victory">
+        <div class="modal-illust-wrap">
+          <img src="/images/bocchi-relief.png" alt="안도하는 봇치" />
+        </div>
+        <h2 class="modal-title" style="color: var(--neon-green);">🎉 스테이지 클리어!</h2>
+        <p id="victory-boss-text" class="modal-desc">
+          "다다리오 010 게이지 구매 완료! 무사히 계산을 마치고 가게를 탈출했습니다!"
+        </p>
+        <div class="modal-btn-row">
+          <button id="btn-next-stage" class="btn-primary-big" style="padding: 12px 20px; font-size: 1rem;">다음 스테이지로 ➡️</button>
+          <button id="btn-victory-title" class="btn-icon">타이틀로 이동</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEFEAT MODAL -->
+    <div id="modal-defeat" class="modal-overlay">
+      <div class="modal-card modal-defeat">
+        <div class="modal-illust-wrap" style="background: #2b0c16; border-color: #ff1744;">
+          <img src="/images/bocchi-panic.png" alt="멘탈 붕괴 봇치" />
+        </div>
+        <h2 class="modal-title" style="color: var(--alert-red);">💀 멘탈 붕괴! (GAME OVER)</h2>
+        <p id="defeat-desc-text" class="modal-desc">
+          봇치의 멘탈이 0이 되었습니다! 극한의 사회적 수치심을 이기지 못하고 그 자리에서 먼지가 되어 증발했습니다...
+        </p>
+        <div class="modal-btn-row">
+          <button id="btn-retry-stage" class="btn-primary-big" style="background: linear-gradient(135deg, #ff1744, #d50000); padding: 12px 20px; font-size: 1rem;">다시 도전하기 🔄</button>
+          <button id="btn-defeat-title" class="btn-icon">타이틀로 이동</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALL CLEAR MODAL -->
+    <div id="modal-allclear" class="modal-overlay">
+      <div class="modal-card modal-victory">
+        <div class="modal-illust-wrap">
+          <img src="/images/bocchi-relief.png" alt="대성공 봇치" />
+        </div>
+        <h2 class="modal-title" style="color: var(--nijika-yellow);">🏆 사회생활 서바이벌 완전 제패!</h2>
+        <p class="modal-desc">
+          축하합니다! 악기점 기타줄 사기와 카페 커스텀 주문이라는 인류 최대의 난관을 모두 돌파했습니다!<br/>
+          봇치는 오늘도 한 뼘 성장했습니다... (아마도)
+        </p>
+        <div class="modal-btn-row">
+          <button id="btn-allclear-restart" class="btn-primary-big" style="padding: 12px 20px; font-size: 1rem;">처음부터 다시하기 🔄</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/survival/main.ts"></script>
+</body>
+</html>

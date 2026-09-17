@@ -210,7 +210,8 @@ export class CanvasRenderer {
     const laneWidth = Math.min(targetLaneWidth, Math.floor(maxAvailableWidth / laneCount));
     const gearWidth = laneCount * laneWidth;
     const gearX = (w - gearWidth) / 2;
-    const judgeLineY = h - 135; // 판정선 Y 좌표
+    // 판정선 Y 좌표: 화면 하단 약 1/3(32~33%) 지점으로 상향 배치 (시야각 최적화 및 목/눈 피로 방지)
+    const judgeLineY = Math.round(h * 0.68);
     const laneColors = keyMode === '4K' ? this.LANE_COLORS_4K : this.LANE_COLORS_6K;
 
     // 새로운 판정 이벤트 처리 (팝업 및 파티클 트리거)
@@ -230,14 +231,14 @@ export class CanvasRenderer {
     // 4. 노트 렌더링 (단타 및 롱노트)
     this.drawNotes(notes, currentSongTime, speedMultiplier, gearX, laneWidth, judgeLineY, laneColors);
 
-    // 5. 건반 하단 캡 및 키 가이드 텍스트
-    this.drawKeycaps(gearX, laneWidth, laneCount, judgeLineY, input, keyMode, laneColors);
+    // 5. 건반 하단 캡 및 하단 STARRY 스테이지 콘솔 덱
+    this.drawKeycaps(gearX, laneWidth, laneCount, judgeLineY, input, keyMode, laneColors, stats);
 
     // 6. 타격 파티클 렌더링
     this.updateAndDrawParticles();
 
     // 7. 판정 텍스트 & 콤보 팝업 렌더링 (키 빔 윗 공간)
-    this.drawJudgementAndCombo(w / 2, judgeLineY - 170, stats.combo);
+    this.drawJudgementAndCombo(w / 2, judgeLineY - 150, stats.combo);
 
     // 8. 양쪽 게이지 (Groove HP / Fever) 렌더링
     this.drawGauges(gearX, gearWidth, judgeLineY, stats);
@@ -478,30 +479,49 @@ export class CanvasRenderer {
     judgeLineY: number,
     input: InputManager,
     keyMode: KeyMode,
-    laneColors: string[]
+    laneColors: string[],
+    stats: GameStats
   ) {
     const ctx = this.ctx;
     const h = this.height;
-    const capHeight = h - judgeLineY;
+    const bottomAreaHeight = h - judgeLineY;
+    const buttonHeight = Math.min(95, Math.max(68, Math.round(bottomAreaHeight * 0.35)));
 
     ctx.save();
+
+    // 1. 건반 버튼 (Keycaps)
     for (let i = 0; i < laneCount; i++) {
       const lx = gearX + i * laneWidth;
       const isPressed = input.isLanePressed(i);
       const color = laneColors[i];
+      const btnY = judgeLineY + 5;
+      const btnH = buttonHeight;
 
-      // 건반 캡 배경
+      // 건반 캡 배경 그라디언트
+      const btnGrad = ctx.createLinearGradient(0, btnY, 0, btnY + btnH);
       if (isPressed) {
-        ctx.fillStyle = this.hexToRgba(color, 0.45);
+        btnGrad.addColorStop(0, this.hexToRgba(color, 0.85));
+        btnGrad.addColorStop(0.35, this.hexToRgba(color, 0.55));
+        btnGrad.addColorStop(1, this.hexToRgba(color, 0.25));
+        ctx.fillStyle = btnGrad;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 14;
       } else {
-        ctx.fillStyle = 'rgba(15, 22, 38, 0.85)';
+        btnGrad.addColorStop(0, 'rgba(24, 32, 52, 0.92)');
+        btnGrad.addColorStop(1, 'rgba(12, 17, 30, 0.95)');
+        ctx.fillStyle = btnGrad;
+        ctx.shadowBlur = 0;
       }
-      ctx.fillRect(lx + 3, judgeLineY + 6, laneWidth - 6, capHeight - 14);
+      ctx.fillRect(lx + 3, btnY, laneWidth - 6, btnH);
 
-      // 상단 테두리
-      ctx.strokeStyle = isPressed ? color : 'rgba(255, 255, 255, 0.22)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(lx + 3, judgeLineY + 6, laneWidth - 6, capHeight - 14);
+      // 상단 베벨 하이라이트 라인
+      ctx.fillStyle = isPressed ? '#ffffff' : this.hexToRgba(color, 0.7);
+      ctx.fillRect(lx + 5, btnY + 2, laneWidth - 10, 3);
+
+      // 외곽 테두리
+      ctx.strokeStyle = isPressed ? '#ffffff' : this.hexToRgba(color, 0.35);
+      ctx.lineWidth = isPressed ? 2.5 : 1.5;
+      ctx.strokeRect(lx + 3, btnY, laneWidth - 6, btnH);
 
       // 키 매핑 텍스트 라벨 (예: D, F, J, K)
       const keyName = input.getKeyNameForLane(i, keyMode);
@@ -509,16 +529,92 @@ export class CanvasRenderer {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = isPressed ? '#ffffff' : this.hexToRgba(color, 0.95);
-      ctx.fillText(keyName, lx + laneWidth / 2, judgeLineY + 34);
+      ctx.shadowColor = isPressed ? color : 'transparent';
+      ctx.shadowBlur = isPressed ? 8 : 0;
+      ctx.fillText(keyName, lx + laneWidth / 2, btnY + btnH * 0.44);
 
-      // 4K 모드일 때 결속밴드 4인 상징 멤버 표기 (보치, 니지카, 료, 키타)
+      // 4K 모드일 때 결속밴드 4인 상징 멤버 표기 (BOCCHI, NIJIKA, RYO, KITA)
       if (keyMode === '4K') {
         const memberNames = ['BOCCHI', 'NIJIKA', 'RYO', 'KITA'];
         ctx.font = '800 11px Orbitron, sans-serif';
         ctx.fillStyle = isPressed ? '#ffffff' : this.hexToRgba(color, 0.75);
-        ctx.fillText(memberNames[i], lx + laneWidth / 2, judgeLineY + 58);
+        ctx.fillText(memberNames[i], lx + laneWidth / 2, btnY + btnH * 0.76);
       }
     }
+
+    // 2. 하단 STARRY 라이브 스테이지 콘솔 덱 (아케이드 감성 디자인)
+    const deckY = judgeLineY + buttonHeight + 11;
+    const deckHeight = h - deckY - 8;
+
+    if (deckHeight >= 36) {
+      // 덱 메인 프레임 배경
+      const deckGrad = ctx.createLinearGradient(0, deckY, 0, deckY + deckHeight);
+      deckGrad.addColorStop(0, 'rgba(10, 14, 26, 0.98)');
+      deckGrad.addColorStop(0.5, 'rgba(15, 20, 38, 0.95)');
+      deckGrad.addColorStop(1, 'rgba(8, 11, 20, 0.98)');
+      ctx.fillStyle = deckGrad;
+      ctx.fillRect(gearX + 3, deckY, (laneCount * laneWidth) - 6, deckHeight);
+
+      // 덱 외곽선 (피버 모드 시 핑크 글로우)
+      const deckBorder = stats.isFeverActive ? '#ff6b9d' : 'rgba(255, 225, 105, 0.35)';
+      ctx.strokeStyle = deckBorder;
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = stats.isFeverActive ? '#ff6b9d' : 'rgba(255, 225, 105, 0.4)';
+      ctx.shadowBlur = stats.isFeverActive ? 12 : 6;
+      ctx.strokeRect(gearX + 3, deckY, (laneCount * laneWidth) - 6, deckHeight);
+
+      // 레인별 동적 LED 인디케이터
+      for (let i = 0; i < laneCount; i++) {
+        const lx = gearX + i * laneWidth;
+        const isPressed = input.isLanePressed(i);
+        const color = laneColors[i];
+
+        // 상단 LED 램프
+        const ledY = deckY + 6;
+        const ledH = 4;
+        if (isPressed) {
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 10;
+          ctx.fillRect(lx + 8, ledY, laneWidth - 16, ledH);
+        } else {
+          ctx.fillStyle = this.hexToRgba(color, 0.25);
+          ctx.shadowBlur = 0;
+          ctx.fillRect(lx + 8, ledY, laneWidth - 16, ledH);
+        }
+
+        // 세로 레일 구분선
+        if (i > 0) {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(lx, deckY);
+          ctx.lineTo(lx, deckY + deckHeight);
+          ctx.stroke();
+        }
+      }
+
+      // 중앙 STARRY 스테이지 엠블럼 텍스트
+      const centerX = gearX + (laneCount * laneWidth) / 2;
+      const centerY = deckY + deckHeight / 2 + 3;
+
+      if (deckHeight >= 55) {
+        ctx.font = '900 12px Orbitron, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const starColor = stats.isFeverActive ? '#ff6b9d' : '#ffe169';
+        ctx.fillStyle = starColor;
+        ctx.shadowColor = starColor;
+        ctx.shadowBlur = 8;
+        ctx.fillText('★ LIVE HOUSE STARRY ★', centerX, centerY - 8);
+
+        ctx.font = '700 9px Orbitron, sans-serif';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.shadowBlur = 0;
+        ctx.fillText('KESSOKU BAND STAGE CONSOLE', centerX, centerY + 10);
+      }
+    }
+
     ctx.restore();
   }
 

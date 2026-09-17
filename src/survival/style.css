@@ -1,0 +1,732 @@
+/* ==========================================================================
+   BOCCHI'S SOCIAL SURVIVAL RPG - STYLESHEET
+   ========================================================================== */
+
+:root {
+  --bocchi-pink: #ff6b9d;
+  --bocchi-light-pink: #ffc2d9;
+  --bocchi-dark: #120914;
+  --bocchi-card-bg: rgba(26, 14, 30, 0.88);
+  --bocchi-border: #ff6b9d;
+
+  --kita-red: #ff5252;
+  --ryo-blue: #00e5ff;
+  --nijika-yellow: #ffd600;
+
+  --neon-green: #00e676;
+  --neon-purple: #b388ff;
+  --alert-red: #ff1744;
+
+  --font-main: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'M PLUS Rounded 1c', 'Orbitron', 'Noto Sans KR', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body {
+  background-color: var(--bocchi-dark);
+  color: #f1f1f1;
+  font-family: var(--font-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Background speedlines & ambient */
+.bg-ambient {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle at 50% 30%, rgba(255, 107, 157, 0.15), transparent 70%),
+              radial-gradient(circle at 80% 80%, rgba(0, 229, 255, 0.1), transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Screen Shake Effect */
+.screen-shake {
+  animation: shake 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-3px, 0, 0); }
+  20%, 80% { transform: translate3d(4px, 2px, 0); }
+  30%, 50%, 70% { transform: translate3d(-6px, -3px, 0); }
+  40%, 60% { transform: translate3d(6px, 1px, 0); }
+}
+
+/* Panic Vignette */
+.panic-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  box-shadow: inset 0 0 100px rgba(255, 23, 68, 0.65);
+  pointer-events: none;
+  z-index: 99;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  animation: pulsePanic 1.2s infinite alternate;
+}
+
+.panic-overlay.active {
+  opacity: 1;
+}
+
+@keyframes pulsePanic {
+  0% { box-shadow: inset 0 0 60px rgba(255, 23, 68, 0.4); }
+  100% { box-shadow: inset 0 0 130px rgba(255, 23, 68, 0.85); }
+}
+
+/* App Container */
+#rpg-app {
+  position: relative;
+  z-index: 10;
+  max-width: 1100px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+/* Top Nav Bar */
+.top-navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bocchi-card-bg);
+  border: 1px solid rgba(255, 107, 157, 0.3);
+  border-radius: 12px;
+  padding: 10px 18px;
+  margin-bottom: 16px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+.nav-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 1.1rem;
+  color: var(--bocchi-pink);
+  text-shadow: 0 0 10px rgba(255, 107, 157, 0.4);
+}
+
+.nav-badge {
+  background: rgba(255, 107, 157, 0.2);
+  border: 1px solid var(--bocchi-pink);
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  color: #fff;
+}
+
+.nav-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-icon {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-icon:hover {
+  background: rgba(255, 107, 157, 0.3);
+  border-color: var(--bocchi-pink);
+  transform: translateY(-2px);
+}
+
+/* Screens */
+.screen {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+}
+
+.screen.active {
+  display: flex;
+}
+
+/* ==========================================================================
+   TITLE SCREEN
+   ========================================================================== */
+#screen-title {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.title-hero-card {
+  background: var(--bocchi-card-bg);
+  border: 2px solid var(--bocchi-pink);
+  border-radius: 20px;
+  padding: 40px 30px;
+  max-width: 650px;
+  box-shadow: 0 0 40px rgba(255, 107, 157, 0.3);
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+}
+
+.title-badge {
+  display: inline-block;
+  background: #ff1744;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 4px 14px;
+  border-radius: 20px;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+  animation: pulse 2s infinite;
+}
+
+.title-h1 {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 2px 2px 0 var(--bocchi-pink), 4px 4px 0 #000;
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+
+.title-sub {
+  font-size: 1.05rem;
+  color: var(--bocchi-light-pink);
+  margin-bottom: 24px;
+}
+
+.bocchi-portrait-wrap {
+  width: 170px;
+  height: 170px;
+  margin: 0 auto 24px auto;
+  border-radius: 50%;
+  border: 3px solid var(--bocchi-pink);
+  background: radial-gradient(circle, rgba(255, 107, 157, 0.2), #150a1a);
+  overflow: hidden;
+  box-shadow: 0 0 25px rgba(255, 107, 157, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bocchi-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.intro-desc-box {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 10px;
+  padding: 16px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #e0e0e0;
+  margin-bottom: 30px;
+  text-align: left;
+}
+
+.start-action-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-primary-big {
+  background: linear-gradient(135deg, #ff4081, #e91e63);
+  color: #fff;
+  border: none;
+  padding: 16px 24px;
+  font-size: 1.25rem;
+  font-weight: 900;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  letter-spacing: 1px;
+  box-shadow: 0 8px 25px rgba(233, 30, 99, 0.4);
+  transition: all 0.25s;
+}
+
+.btn-primary-big:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 30px rgba(233, 30, 99, 0.6);
+}
+
+/* ==========================================================================
+   BATTLE ARENA SCREEN
+   ========================================================================== */
+.battle-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+/* Stage Header Bar */
+.stage-banner {
+  background: var(--bocchi-card-bg);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 12px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stage-info-col h2 {
+  font-size: 1.15rem;
+  font-family: var(--font-display);
+  color: var(--nijika-yellow);
+}
+
+.stage-info-col p {
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+.turn-indicator {
+  background: rgba(255, 107, 157, 0.15);
+  border: 1px solid var(--bocchi-pink);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--bocchi-pink);
+}
+
+/* Top Duel Area (Boss vs Bocchi) */
+.duel-zone {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .duel-zone {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Character Cards */
+.char-card {
+  background: var(--bocchi-card-bg);
+  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.boss-card {
+  border-color: rgba(255, 82, 82, 0.4);
+}
+
+.bocchi-card {
+  border-color: rgba(255, 107, 157, 0.5);
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.avatar-frame {
+  width: 68px;
+  height: 68px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e1124;
+  flex-shrink: 0;
+}
+
+.avatar-frame.boss-avatar {
+  background: linear-gradient(135deg, #ff5252, #ff7043);
+  font-size: 2.2rem;
+}
+
+.avatar-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.char-meta h3 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  font-family: var(--font-display);
+}
+
+.char-meta p {
+  font-size: 0.8rem;
+  color: #bbb;
+}
+
+/* Status Gauge Bars */
+.gauge-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.gauge-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gauge-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.gauge-bar-bg {
+  width: 100%;
+  height: 14px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gauge-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.fill-mental {
+  background: linear-gradient(90deg, #ff1744, #ff6b9d);
+}
+
+.fill-progress {
+  background: linear-gradient(90deg, #00b0ff, #00e676);
+}
+
+.fill-sp {
+  display: flex;
+  gap: 4px;
+}
+
+.sp-pip {
+  width: 24px;
+  height: 10px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s;
+}
+
+.sp-pip.active {
+  background: var(--nijika-yellow);
+  box-shadow: 0 0 8px var(--nijika-yellow);
+  border-color: #fff;
+}
+
+/* Dialogue Bubble inside card */
+.bubble-box {
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  border-left: 4px solid var(--bocchi-pink);
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  min-height: 64px;
+}
+
+.boss-bubble {
+  border-left-color: var(--kita-red);
+}
+
+.thought-bubble {
+  border-left-color: var(--neon-purple);
+  color: #d1c4e9;
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* ==========================================================================
+   BATTLE LOG CONSOLE
+   ========================================================================== */
+.battle-log-card {
+  background: var(--bocchi-card-bg);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 12px 16px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.log-item {
+  line-height: 1.4;
+  animation: fadeIn 0.2s ease-in;
+}
+
+.log-boss { color: #ff8a80; }
+.log-bocchi { color: #ff80ab; }
+.log-assist { color: #84ffff; font-weight: 700; }
+.log-system { color: #ffd54f; font-weight: 700; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================================================
+   COMMAND CONTROLS & ASSIST PANEL
+   ========================================================================== */
+.action-grid-section {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 860px) {
+  .action-grid-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel-title-label {
+  font-size: 0.85rem;
+  color: #aaa;
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.commands-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cmd-btn {
+  background: linear-gradient(135deg, rgba(255, 107, 157, 0.15), rgba(40, 20, 50, 0.9));
+  border: 2px solid rgba(255, 107, 157, 0.4);
+  border-radius: 12px;
+  padding: 12px;
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cmd-btn:hover:not(:disabled) {
+  border-color: var(--bocchi-pink);
+  background: linear-gradient(135deg, rgba(255, 107, 157, 0.3), rgba(60, 25, 75, 0.95));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(255, 107, 157, 0.3);
+}
+
+.cmd-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.cmd-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+}
+
+.cmd-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cmd-desc {
+  font-size: 0.75rem;
+  color: #ccc;
+  line-height: 1.3;
+}
+
+.cmd-tag {
+  font-size: 0.7rem;
+  color: var(--nijika-yellow);
+  font-weight: 700;
+}
+
+/* Assist (Kessoku Band) Buttons */
+.assists-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.assist-btn {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s;
+}
+
+.assist-btn:hover:not(:disabled) {
+  transform: translateX(4px);
+  border-color: var(--ryo-blue);
+  background: rgba(0, 229, 255, 0.15);
+}
+
+.assist-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.assist-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.assist-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.assist-info h4 {
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.assist-info p {
+  font-size: 0.7rem;
+  color: #bbb;
+}
+
+/* ==========================================================================
+   MODALS (VICTORY & DEFEAT)
+   ========================================================================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+  padding: 20px;
+}
+
+.modal-overlay.active {
+  display: flex;
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-card {
+  background: var(--bocchi-card-bg);
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+  border: 3px solid;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+}
+
+.modal-victory {
+  border-color: var(--neon-green);
+  box-shadow: 0 0 35px rgba(0, 230, 118, 0.4);
+}
+
+.modal-defeat {
+  border-color: var(--alert-red);
+  box-shadow: 0 0 35px rgba(255, 23, 68, 0.5);
+}
+
+.modal-illust-wrap {
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 16px auto;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #fff;
+}
+
+.modal-illust-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+
+.modal-desc {
+  font-size: 0.95rem;
+  color: #ddd;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.modal-btn-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
