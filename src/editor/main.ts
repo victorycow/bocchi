@@ -174,6 +174,7 @@ class ChartEditorApp {
       snapDiv: 8,
       pixelsPerBeat: 130
     });
+    this.canvasEditor.onActionSound(() => this.playTapSound());
 
     this.recorder = new ChartRecorder(
       this.canvasEditor,
@@ -395,12 +396,14 @@ class ChartEditorApp {
       this.canvasEditor.noteMode = 'normal';
       this.modeNormalBtn.classList.add('active');
       this.modeHoldBtn.classList.remove('active');
+      this.showToast('ℹ️ TAP 모드: 클릭시 단타, 드래그시 롱노트');
     });
 
     this.modeHoldBtn.addEventListener('click', () => {
       this.canvasEditor.noteMode = 'hold';
       this.modeHoldBtn.classList.add('active');
       this.modeNormalBtn.classList.remove('active');
+      this.showToast('ℹ️ HOLD 모드: 클릭시 1박자 롱노트, 드래그시 지정 길이 롱노트');
     });
 
     // 실시간 탭 녹음

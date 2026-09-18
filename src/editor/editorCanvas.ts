@@ -30,9 +30,21 @@ export class EditorCanvas {
   private dragHoldStartTime: number | null = null;
   private dragHoldCurrentTime: number | null = null;
 
+  private pendingAction: {
+    startLane: number;
+    startTime: number;
+    startY: number;
+    startX: number;
+    hasMoved: boolean;
+    isResizingTail: boolean;
+    resizingNoteId: number | null;
+    existingNoteId: number | null;
+  } | null = null;
+
   // Callbacks
   private onNotesChangedCb: (() => void) | null = null;
   private onSeekCb: ((time: number) => void) | null = null;
+  private onActionSoundCb: (() => void) | null = null;
 
   public noteMode: 'normal' | 'hold' = 'normal';
 
@@ -78,12 +90,52 @@ export class EditorCanvas {
     this.onSeekCb = cb;
   }
 
+  public onActionSound(cb: () => void) {
+    this.onActionSoundCb = cb;
+  }
+
+  public addHoldNote(lane: number, startTime: number, duration: number): boolean {
+    if (lane < 0 || lane >= 4 || startTime < 0 || duration <= 0) return false;
+
+    const roundStart = Math.round(startTime * 1000) / 1000;
+    const roundDur = Math.round(duration * 1000) / 1000;
+    const endTime = roundStart + roundDur;
+
+    // 해당 레인에서 이 롱노트와 겹치는 기존 노트들(단타/롱노트) 자동 정리
+    this.notes = this.notes.filter(n => {
+      if (n.lane !== lane) return true;
+      const nEnd = n.type === 'hold' ? n.time + n.duration : n.time;
+      const isOverlapping = !(nEnd < roundStart - 0.02 || n.time > endTime + 0.02);
+      return !isOverlapping;
+    });
+
+    const newNote: NoteData = {
+      id: Date.now() + Math.floor(Math.random() * 100000),
+      lane,
+      time: roundStart,
+      duration: roundDur,
+      type: 'hold'
+    };
+
+    this.notes.push(newNote);
+    this.sortNotes();
+    this.render();
+    this.onNotesChangedCb?.();
+    return true;
+  }
+
   public addNoteAt(lane: number, time: number, duration = 0, type: NoteType = 'normal'): boolean {
     if (lane < 0 || lane >= 4 || time < 0) return false;
 
-    // 중복 검사: 같은 레인에 비슷한 시간대(0.02초 이내)의 노트가 있으면 무시
+    if (duration > 0.05 || type === 'hold') {
+      return this.addHoldNote(lane, time, Math.max(0.05, duration));
+    }
+
+    const roundTime = Math.round(time * 1000) / 1000;
+
+    // 중복 검사: 같은 레인에 비슷한 시간대(0.03초 이내)의 노트가 있으면 무시
     const existingIdx = this.notes.findIndex(
-      n => n.lane === lane && Math.abs(n.time - time) < 0.03
+      n => n.lane === lane && Math.abs(n.time - roundTime) < 0.03
     );
 
     if (existingIdx >= 0) {
@@ -93,9 +145,9 @@ export class EditorCanvas {
     const newNote: NoteData = {
       id: Date.now() + Math.floor(Math.random() * 100000),
       lane,
-      time: Math.round(time * 1000) / 1000,
-      duration: Math.max(0, Math.round(duration * 1000) / 1000),
-      type: duration > 0.08 ? 'hold' : type
+      time: roundTime,
+      duration: 0,
+      type: 'normal'
     };
 
     this.notes.push(newNote);
@@ -182,6 +234,15 @@ export class EditorCanvas {
     ro.observe(this.container);
   }
 
+  private isNearAnyHoldTail(lane: number | null, rawHoverTime: number, pixelsPerSecond: number): boolean {
+    if (lane === null) return false;
+    return this.notes.some(n => {
+      if (n.lane !== lane || n.type !== 'hold' || n.duration <= 0) return false;
+      const tailT = n.time + n.duration;
+      return Math.abs(tailT - rawHoverTime) * pixelsPerSecond <= 16;
+    });
+  }
+
   private setupMouseEvents() {
     // 캔버스 우클릭 브라우저 메뉴 차단 (우클릭 노트 삭제 전용)
     this.canvas.addEventListener('contextmenu', (e) => {
@@ -208,11 +269,44 @@ export class EditorCanvas {
 
       // 우클릭 드래그 지우개: 우클릭을 누른 상태로 이동 시 지나가는 모든 노트 즉시 삭제
       if ((e.buttons & 2) === 2 && this.hoverLane !== null) {
-        this.deleteNoteAtPosition(this.hoverLane, rawHoverTime, pixelsPerSecond);
+        if (this.deleteNoteAtPosition(this.hoverLane, rawHoverTime, pixelsPerSecond)) {
+          this.onActionSoundCb?.();
+        }
       }
 
-      if (this.isDraggingHold && this.dragHoldStartTime !== null) {
-        this.dragHoldCurrentTime = Math.max(this.dragHoldStartTime + 0.05, this.hoverTime);
+      // 좌클릭 누른 상태 드래그 처리
+      if ((e.buttons & 1) === 1 && this.pendingAction) {
+        const distY = Math.abs(e.clientY - this.pendingAction.startY);
+        const timeDiff = Math.abs(this.hoverTime - this.pendingAction.startTime);
+
+        // 4픽셀 이상 움직였거나 비트 스냅이 변하면 드래그로 판정!
+        if (!this.pendingAction.hasMoved && (distY > 4 || timeDiff > 0.02)) {
+          this.pendingAction.hasMoved = true;
+        }
+
+        if (this.pendingAction.hasMoved || this.noteMode === 'hold') {
+          if (this.pendingAction.isResizingTail && this.pendingAction.resizingNoteId !== null) {
+            const note = this.notes.find(n => n.id === this.pendingAction!.resizingNoteId);
+            if (note) {
+              const newDur = Math.max(0.05, this.hoverTime - note.time);
+              note.duration = Math.round(newDur * 1000) / 1000;
+            }
+          } else {
+            this.isDraggingHold = true;
+            this.dragHoldStartLane = this.pendingAction.startLane;
+            this.dragHoldStartTime = this.pendingAction.startTime;
+            this.dragHoldCurrentTime = this.hoverTime;
+          }
+        }
+      } else {
+        // 마우스 버튼 안 누르고 호버 중일 때 커서 모양 변경
+        if (x < this.RULER_WIDTH) {
+          this.canvas.style.cursor = 'pointer';
+        } else if (this.isNearAnyHoldTail(this.hoverLane, rawHoverTime, pixelsPerSecond)) {
+          this.canvas.style.cursor = 'ns-resize';
+        } else {
+          this.canvas.style.cursor = 'crosshair';
+        }
       }
 
       this.render();
@@ -221,8 +315,8 @@ export class EditorCanvas {
     this.canvas.addEventListener('mouseleave', () => {
       this.hoverLane = null;
       this.hoverTime = null;
-      if (this.isDraggingHold) {
-        this.finishHoldDrag();
+      if (this.isDraggingHold || this.pendingAction) {
+        this.finishPointerDrag();
       }
       this.render();
     });
@@ -239,7 +333,9 @@ export class EditorCanvas {
           const pixelsPerSecond = this.getPixelsPerSecond();
           const playheadY = this.getPlayheadY(rect.height);
           const rawHoverTime = this.currentTime + (playheadY - y) / pixelsPerSecond;
-          this.deleteNoteAtPosition(this.hoverLane, rawHoverTime, pixelsPerSecond);
+          if (this.deleteNoteAtPosition(this.hoverLane, rawHoverTime, pixelsPerSecond)) {
+            this.onActionSoundCb?.();
+          }
         }
         return;
       }
@@ -259,31 +355,74 @@ export class EditorCanvas {
 
       const targetLane = this.hoverLane;
       const targetTime = this.hoverTime;
+      const pixelsPerSecond = this.getPixelsPerSecond();
+      const playheadY = this.getPlayheadY(rect.height);
+      const rawHoverTime = this.currentTime + (playheadY - y) / pixelsPerSecond;
 
-      // 1. 기존 노트 좌클릭 시 토글 삭제
-      const tolerance = (this.config.bpm > 180 ? 0.07 : 0.05);
-      const existing = this.notes.find(n => n.lane === targetLane && Math.abs(n.time - targetTime) < tolerance);
+      let isResizingTail = false;
+      let resizingNoteId: number | null = null;
+      let existingNoteId: number | null = null;
+      let baseStartTime = targetTime;
 
-      if (existing) {
-        this.deleteNoteAt(targetLane, existing.time, 0.08);
-        return;
+      // 1) 롱노트 테일(끝단) 클릭 감지
+      for (const note of this.notes) {
+        if (note.lane === targetLane && note.type === 'hold' && note.duration > 0) {
+          const tailT = note.time + note.duration;
+          const distTailPx = Math.abs((rawHoverTime - tailT) * pixelsPerSecond);
+          if (distTailPx <= 16) {
+            isResizingTail = true;
+            resizingNoteId = note.id;
+            baseStartTime = note.time;
+            break;
+          }
+        }
       }
 
-      // 2. 새 노트 생성 (단타 vs 롱노트 드래그 시작)
-      if (this.noteMode === 'hold') {
+      // 2) 테일이 아니면 기존 노트(헤드 또는 바디) 감지
+      if (!isResizingTail) {
+        for (const note of this.notes) {
+          if (note.lane === targetLane) {
+            if (note.type === 'hold') {
+              if (rawHoverTime >= note.time - 0.04 && rawHoverTime <= note.time + note.duration + 0.04) {
+                existingNoteId = note.id;
+                baseStartTime = note.time;
+                break;
+              }
+            } else {
+              const distPx = Math.abs((rawHoverTime - note.time) * pixelsPerSecond);
+              if (distPx <= 22) {
+                existingNoteId = note.id;
+                baseStartTime = note.time;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      this.pendingAction = {
+        startLane: targetLane,
+        startTime: baseStartTime,
+        startY: e.clientY,
+        startX: e.clientX,
+        hasMoved: false,
+        isResizingTail,
+        resizingNoteId,
+        existingNoteId
+      };
+
+      // 만약 HOLD 모드일 경우 즉시 드래그 상태 준비
+      if (this.noteMode === 'hold' && !isResizingTail) {
         this.isDraggingHold = true;
         this.dragHoldStartLane = targetLane;
-        this.dragHoldStartTime = targetTime;
-        this.dragHoldCurrentTime = targetTime + 0.2;
-      } else {
-        // 단타 생성
-        this.addNoteAt(targetLane, targetTime, 0, 'normal');
+        this.dragHoldStartTime = baseStartTime;
+        this.dragHoldCurrentTime = targetTime;
       }
     });
 
     window.addEventListener('mouseup', () => {
-      if (this.isDraggingHold) {
-        this.finishHoldDrag();
+      if (this.pendingAction) {
+        this.finishPointerDrag();
       }
     });
 
@@ -298,15 +437,56 @@ export class EditorCanvas {
     }, { passive: false });
   }
 
-  private finishHoldDrag() {
-    if (this.dragHoldStartLane !== null && this.dragHoldStartTime !== null && this.dragHoldCurrentTime !== null) {
-      const startTime = Math.min(this.dragHoldStartTime, this.dragHoldCurrentTime);
-      const endTime = Math.max(this.dragHoldStartTime, this.dragHoldCurrentTime);
-      const duration = endTime - startTime;
-      if (duration > 0.08) {
-        this.addNoteAt(this.dragHoldStartLane, startTime, duration, 'hold');
+  private finishPointerDrag() {
+    if (!this.pendingAction) return;
+    const action = this.pendingAction;
+    this.pendingAction = null;
+
+    if (action.isResizingTail) {
+      // 롱노트 테일 길이 조절 완료
+      this.sortNotes();
+      this.onNotesChangedCb?.();
+      this.onActionSoundCb?.();
+    } else if (action.hasMoved || (this.isDraggingHold && this.dragHoldStartTime !== null)) {
+      // 마우스를 드래그함 -> 롱노트 생성!
+      const startCandidate = this.dragHoldStartTime ?? action.startTime;
+      const curCandidate = this.dragHoldCurrentTime ?? this.hoverTime ?? action.startTime;
+      const startT = Math.min(startCandidate, curCandidate);
+      const endT = Math.max(startCandidate, curCandidate);
+      const duration = Math.round((endT - startT) * 1000) / 1000;
+
+      if (duration >= 0.06) {
+        this.addHoldNote(action.startLane, startT, duration);
+        this.onActionSoundCb?.();
+      } else {
+        // 드래그 거리가 0.06초 미만인 미세 클릭인 경우
+        if (action.existingNoteId === null) {
+          this.addNoteAt(action.startLane, action.startTime, 0, 'normal');
+          this.onActionSoundCb?.();
+        }
+      }
+    } else {
+      // 단순 클릭 (드래그하지 않음)
+      if (action.existingNoteId !== null) {
+        // 기존 노트 클릭 -> 삭제 (토글 기능)
+        this.deleteNoteById(action.existingNoteId);
+        this.onActionSoundCb?.();
+      } else {
+        // 빈 공간 클릭
+        if (this.noteMode === 'hold') {
+          // HOLD 모드일 때는 기본 1박자 길이의 롱노트 즉시 생성
+          const beatSec = 60 / this.config.bpm;
+          const defaultHoldDur = Math.round(beatSec * 1000) / 1000;
+          this.addHoldNote(action.startLane, action.startTime, defaultHoldDur);
+          this.onActionSoundCb?.();
+        } else {
+          // 일반 모드: 단타 노트 생성
+          this.addNoteAt(action.startLane, action.startTime, 0, 'normal');
+          this.onActionSoundCb?.();
+        }
       }
     }
+
     this.isDraggingHold = false;
     this.dragHoldStartLane = null;
     this.dragHoldStartTime = null;
@@ -512,6 +692,7 @@ export class EditorCanvas {
     const lane = this.dragHoldStartLane!;
     const startT = Math.min(this.dragHoldStartTime!, this.dragHoldCurrentTime!);
     const endT = Math.max(this.dragHoldStartTime!, this.dragHoldCurrentTime!);
+    const duration = Math.max(0.01, endT - startT);
 
     const lx = this.RULER_WIDTH + lane * laneWidth;
     const color = this.LANE_COLORS[lane];
@@ -520,12 +701,48 @@ export class EditorCanvas {
     const bodyH = Math.max(4, headY - tailY);
 
     ctx.save();
-    ctx.fillStyle = this.hexToRgba(color, 0.5);
+    // 롱노트 바디 그라디언트
+    const grad = ctx.createLinearGradient(0, tailY, 0, headY);
+    grad.addColorStop(0, this.hexToRgba(color, 0.45));
+    grad.addColorStop(1, this.hexToRgba(color, 0.8));
+    ctx.fillStyle = grad;
     ctx.fillRect(lx + 6, tailY, laneWidth - 12, bodyH);
+
+    // 테두리
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
     ctx.strokeRect(lx + 6, tailY, laneWidth - 12, bodyH);
+
+    // 테일 바 (상단 끝단)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(lx + 6, tailY - 4, laneWidth - 12, 6);
+
+    // 헤드 블록 (하단 시작점)
     this.renderNoteBlock(ctx, lx + 4, headY - 22, laneWidth - 8, 22, color);
+
+    // 길이 뱃지 (말풍선 태그)
+    const beatSec = 60 / this.config.bpm;
+    const beats = duration / beatSec;
+    const badgeText = `${duration.toFixed(2)}s (${beats.toFixed(1)}B)`;
+
+    ctx.font = 'bold 11px Orbitron, sans-serif';
+    const textW = ctx.measureText(badgeText).width;
+    const badgeW = textW + 14;
+    const badgeH = 18;
+    const badgeX = lx + laneWidth / 2 - badgeW / 2;
+    const badgeY = tailY - 26;
+
+    ctx.fillStyle = 'rgba(10, 14, 28, 0.9)';
+    ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(badgeX, badgeY, badgeW, badgeH);
+
+    ctx.fillStyle = '#ffe169';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(badgeText, lx + laneWidth / 2, badgeY + badgeH / 2);
+
     ctx.restore();
   }
 
