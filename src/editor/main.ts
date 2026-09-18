@@ -853,6 +853,10 @@ class ChartEditorApp {
     this.testRenderer = new CanvasRenderer(this.testGameCanvas);
     this.testRenderer.resize(w, h);
 
+    if (this.testInput) {
+      this.testInput.destroy();
+      this.testInput = null;
+    }
     this.testInput = new InputManager();
     this.testInput.setMode('4K');
 
@@ -939,7 +943,10 @@ class ChartEditorApp {
     this.testOverlay.classList.add('hidden');
     this.testJudgement = null;
     this.testRenderer = null;
-    this.testInput = null;
+    if (this.testInput) {
+      this.testInput.destroy();
+      this.testInput = null;
+    }
     this.playPauseBtn.textContent = '▶ PLAY';
   }
 

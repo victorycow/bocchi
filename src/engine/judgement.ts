@@ -39,6 +39,8 @@ export class JudgementEngine {
   private keyMode: KeyMode = '4K';
   private difficulty: Difficulty = 'NORMAL';
 
+  private lastHitTimePerLane: number[] = [0, 0, 0, 0, 0, 0];
+
   constructor() {}
 
   public init(songTitle: string, artist: string, keyMode: KeyMode, difficulty: Difficulty, notes: NoteData[]) {
@@ -46,16 +48,19 @@ export class JudgementEngine {
     this.artist = artist;
     this.keyMode = keyMode;
     this.difficulty = difficulty;
+    this.lastHitTimePerLane = [0, 0, 0, 0, 0, 0];
 
-    // 노트 복사 및 초기화
-    this.notes = notes.map(n => ({
-      ...n,
-      hit: false,
-      missed: false,
-      holding: false,
-      holdCompleted: false,
-      holdSuccessTime: 0
-    }));
+    // 노트 복사 및 시간 순 정렬 보장
+    this.notes = notes
+      .map(n => ({
+        ...n,
+        hit: false,
+        missed: false,
+        holding: false,
+        holdCompleted: false,
+        holdSuccessTime: 0
+      }))
+      .sort((a, b) => a.time - b.time);
 
     // 총 점수 1,000,000점 기준 가중치 계산
     const totalCount = this.notes.length;
@@ -101,10 +106,25 @@ export class JudgementEngine {
    * 키를 눌렀을 때(Key Down) 호출
    */
   public handleKeyDown(lane: number, currentSongTime: number) {
-    // 해당 레인에서 아직 판정되지 않은 가장 가까운 노트 찾기
-    const candidates = this.notes.filter(
-      n => n.lane === lane && !n.hit && !n.missed
-    );
+    // 0. 레인별 35ms 이내 초고속 중복 바운스 방지
+    if (this.lastHitTimePerLane[lane] && (currentSongTime - this.lastHitTimePerLane[lane]) < 0.035 && (currentSongTime - this.lastHitTimePerLane[lane]) >= 0) {
+      return;
+    }
+
+    // 1. 이미 판정선을 지나서 늦어버린(180ms 초과) 이전 노트들은 즉시 MISS 처리하여 큐에서 소진
+    for (const note of this.notes) {
+      if (note.lane === lane && !note.hit && !note.missed) {
+        if (currentSongTime - note.time > 0.18) {
+          note.missed = true;
+          this.applyJudgement('MISS', lane, 180, currentSongTime, 0);
+        }
+      }
+    }
+
+    // 2. 해당 레인에서 아직 판정되지 않은 가장 가까운 노트 찾기 (시간 순 정렬)
+    const candidates = this.notes
+      .filter(n => n.lane === lane && !n.hit && !n.missed)
+      .sort((a, b) => a.time - b.time);
 
     if (candidates.length === 0) return;
 
@@ -128,6 +148,7 @@ export class JudgementEngine {
 
     if (matchedJudge) {
       target.hit = true;
+      this.lastHitTimePerLane[lane] = currentSongTime;
       if (target.type === 'hold') {
         target.holding = true;
         target.holdSuccessTime = currentSongTime;
@@ -136,6 +157,7 @@ export class JudgementEngine {
     } else if (diffMs < -180 && diffMs >= -280) {
       // 너무 일찍 침 (Early MISS)
       target.missed = true;
+      this.lastHitTimePerLane[lane] = currentSongTime;
       this.applyJudgement('MISS', lane, diffMs, currentSongTime, 0);
     }
   }

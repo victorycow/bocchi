@@ -65,7 +65,7 @@ export class EditorCanvas {
   }
 
   public getNotes(): NoteData[] {
-    return this.notes.map(n => ({ ...n }));
+    return [...this.notes].sort((a, b) => a.time - b.time).map(n => ({ ...n }));
   }
 
   public setCurrentTime(t: number) {

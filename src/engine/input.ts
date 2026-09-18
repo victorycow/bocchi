@@ -87,40 +87,50 @@ export class InputManager {
     return code;
   }
 
+  private onKeyDown = (e: KeyboardEvent) => {
+    if (e.repeat) return; // 반복 키 입력 무시 (리듬게임에서 가장 중요)
+
+    const activeKeys = this.bindings[this.currentMode];
+    const lane = activeKeys.indexOf(e.code);
+
+    if (lane !== -1) {
+      e.preventDefault();
+      this.keyState[lane] = true;
+      this.emit(lane, 'down');
+    }
+  };
+
+  private onKeyUp = (e: KeyboardEvent) => {
+    const activeKeys = this.bindings[this.currentMode];
+    const lane = activeKeys.indexOf(e.code);
+
+    if (lane !== -1) {
+      e.preventDefault();
+      this.keyState[lane] = false;
+      this.emit(lane, 'up');
+    }
+  };
+
+  private onBlur = () => {
+    for (let i = 0; i < this.keyState.length; i++) {
+      if (this.keyState[i]) {
+        this.keyState[i] = false;
+        this.emit(i, 'up');
+      }
+    }
+  };
+
   private setupListeners() {
-    window.addEventListener('keydown', (e) => {
-      if (e.repeat) return; // 반복 키 입력 무시 (리듬게임에서 가장 중요)
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('blur', this.onBlur);
+  }
 
-      const activeKeys = this.bindings[this.currentMode];
-      const lane = activeKeys.indexOf(e.code);
-
-      if (lane !== -1) {
-        e.preventDefault();
-        this.keyState[lane] = true;
-        this.emit(lane, 'down');
-      }
-    });
-
-    window.addEventListener('keyup', (e) => {
-      const activeKeys = this.bindings[this.currentMode];
-      const lane = activeKeys.indexOf(e.code);
-
-      if (lane !== -1) {
-        e.preventDefault();
-        this.keyState[lane] = false;
-        this.emit(lane, 'up');
-      }
-    });
-
-    // 창 포커스 아웃 시 모든 키 해제
-    window.addEventListener('blur', () => {
-      for (let i = 0; i < this.keyState.length; i++) {
-        if (this.keyState[i]) {
-          this.keyState[i] = false;
-          this.emit(i, 'up');
-        }
-      }
-    });
+  public destroy() {
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('blur', this.onBlur);
+    this.listeners = [];
   }
 
   private emit(lane: number, type: 'down' | 'up') {
